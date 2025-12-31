@@ -1,0 +1,14 @@
+{
+	"budget": {
+		"script": "srv/budget-state.js",
+		"dependsOn": []
+	},
+	"servers": {
+		"script": "srv/server-state.js",
+		"dependsOn": []
+	},
+	"targets": {
+		"script": "srv/target-state.js",
+		"dependsOn": ["servers"]
+	}
+}
