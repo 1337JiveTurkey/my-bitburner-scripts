@@ -6,6 +6,7 @@ export async function main(ns: NS) {
 	const delay = Number(ns.args[1] || 0)
 	const stock = !!ns.args[2]
 
-	const result = await ns.grow(hostname, { additionalMsec: delay, stock: stock })
+	let result = 1
 	ns.atExit(() => ns.writePort(ns.pid, result))
+	result = await ns.grow(hostname, { additionalMsec: delay, stock: stock })
 }
