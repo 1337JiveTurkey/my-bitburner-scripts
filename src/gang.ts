@@ -1,4 +1,4 @@
-import { NS } from "@ns"
+import {GangMemberInfo, NS} from "@ns"
 
 const gangNames = [
 	"Adalberto",
@@ -130,6 +130,17 @@ function doTerritoryWarfare(ns: NS) {
 	}
 }
 
+interface Members {[name: string]: GangMemberInfo}
+
+function getMembers(ns: NS): Members {
+	const memberNames = ns.gang.getMemberNames()
+	const members: Members = {}
+	for (const m of memberNames) {
+		members[m] = ns.gang.getMemberInformation(m)
+	}
+	return members
+}
+
 interface EquipInfo { name: string, cost: number, eType: string }
 
 function getAllEquipInfo(ns: NS): EquipInfo[] {
@@ -152,21 +163,57 @@ function getAllEquipInfo(ns: NS): EquipInfo[] {
 	return res
 }
 
-interface TaskInfo { name: string, difficulty: number }
+interface TaskInfo {
+	taskName: string
+	difficulty: number
+	gains: GainsInfo
+}
+interface GainsInfo {[memberName: string]: {
+		memberName: string
+		money: number
+		respect: number
+		wanted: number
+	}
+}
 
-function getAllTaskInfo(ns: NS): TaskInfo[] {
-	const gangTasks = ns.gang.getTaskNames()
+/**
+ * Gets the per-member stats about the various combat tasks such as how much
+ * money, wanted level and respect the gang will gain with each.
+ *
+ * @param ns The NS like always
+ * @param gangMembers All members that can complete tasks
+ */
+function getAllTaskInfo(ns: NS, gangMembers: Members): TaskInfo[] {
+	const ng = ns.gang
+	const nfg = ns.formulas.gang
+	const gangInfo = ng.getGangInformation()
+	const gangTasks = ng.getTaskNames()
 	const res: TaskInfo[] = []
 	for (const t of gangTasks) {
-		const stats = ns.gang.getTaskStats(t)
-		if (stats.isCombat) {
-			res.push({
-				name: t,
-				difficulty: stats.difficulty
-			})
+		const stats = ng.getTaskStats(t)
+		if (!stats.isCombat) {
+			continue
 		}
+		const gains: GainsInfo = {}
+		for (const m in gangMembers) {
+			const memberInfo = gangMembers[m]
+			const money = nfg.moneyGain(gangInfo, memberInfo, stats)
+			const respect = nfg.respectGain(gangInfo, memberInfo, stats)
+			const wanted = nfg.wantedLevelGain(gangInfo, memberInfo, stats)
+			gains[m] = {
+				memberName: m,
+				money,
+				respect,
+				wanted
+			}
+		}
+		res.push({
+			taskName: t,
+			difficulty: stats.difficulty,
+			gains
+		})
 	}
-	//	ns.tprint(JSON.stringify(res, null, 2))
+	// ns.tprint(JSON.stringify(res, null, 2))
 	return res
 }
 
@@ -177,7 +224,7 @@ function getAllTaskInfo(ns: NS): TaskInfo[] {
  * changing tasks so that there won't be any situations where
  * task1 -> task2 and task2 -> task3 results in task1 -> task3.
  */
-function setMemberTasks(ns: NS, taskPairs: [string, string][]) {
+function setMemberTasks(ns: NS, taskPairs: [string, string][]): void {
 	const newAssignments: Map<string, string> = new Map()
 	for (const name of ns.gang.getMemberNames()) {
 		for (const [oldTask, newTask] of taskPairs) {
@@ -193,9 +240,9 @@ function setMemberTasks(ns: NS, taskPairs: [string, string][]) {
 }
 
 /**
- * Computes the geometric mean of a gang member's skills.
+ * Computes the geometric mean of a gang member's combat skills.
  */
-function skillAverage(ns: NS, name: string): number {
+function combatSkillAverage(ns: NS, name: string): number {
 	const member = ns.gang.getMemberInformation(name)
 	const average = Math.pow(member.str * member.def * member.dex * member.agi, .25)
 	return average
