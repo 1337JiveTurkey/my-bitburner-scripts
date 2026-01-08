@@ -1,10 +1,18 @@
-import { NS } from "@ns"
+import {NS, ScriptArg} from "@ns"
 
 import { getServerStateMap, ServerState } from "srv/server-state"
 
-const targets = new Set(["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z"])
+const factionTargets = new Set(["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z"])
+const finalTargets = new Set(["w0r1d_d43m0n"])
 
 export async function main(ns: NS) {
+	let targets: Set<String>
+	if (ns.args.length < 1) {
+		targets = factionTargets
+	} else {
+		targets = new Set(ns.args.map(x => x.toString()))
+	}
+
 	const hacking = ns.getPlayer().skills.hacking
 
 	const servers = getServerStateMap(ns)
@@ -28,4 +36,13 @@ export async function main(ns: NS) {
 			ns.singularity.connect("home")
 		}
 	}
+}
+
+export function autocomplete(data: {
+	servers: string[],
+	scripts: string[]
+	txts: string[],
+	flags: (schema: [string, string | number | boolean | string[]][]) => { [key: string]: ScriptArg | string[] }
+}, args: string[]) {
+	return [...data.servers]
 }
