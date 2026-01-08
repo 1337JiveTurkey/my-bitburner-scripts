@@ -1,24 +1,16 @@
 import {GangMemberInfo, NS} from "@ns"
 import {dodgedMain, dodgedProxy} from "lib/dodge-script"
 
-interface Params {
-	members: string[]
-}
-
-interface Return {
-	result: string
-}
-
-export const main = dodgedMain<Params, Return>(async (ns: NS, params: Params) => {
-	const members = params.members.map(arg => ns.gang.getMemberInformation(arg))
+export const main = dodgedMain<string[], string>(async (ns: NS, params: string[]) => {
+	const members = params.map(arg => ns.gang.getMemberInformation(arg))
 
 	for (const member of members) {
 		doAscendMember(ns, member)
 	}
-	return {} as Return
+	return ""
 })
 
-export const ascendMembers = dodgedProxy<Params, Return>("lib/gang/ascendMembers.js")
+export const ascendMembers = dodgedProxy<string[], string>("lib/gang/ascend-members.js")
 
 function doAscendMember(ns: NS, member: GangMemberInfo) {
 	if (!member.task.includes("Train")) {

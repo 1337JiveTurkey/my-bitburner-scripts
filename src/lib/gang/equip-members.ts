@@ -6,11 +6,7 @@ interface Params {
 	members: string[]
 }
 
-interface Return {
-	result: string
-}
-
-export const main = dodgedMain<Params, Return>(async (ns: NS, params: Params) => {
+export const main = dodgedMain<Params, string>(async (ns: NS, params: Params) => {
 	const members = params.members.map(arg => ns.gang.getMemberInformation(arg))
 
 	const equipInfos = getAllEquipInfo(ns)
@@ -18,10 +14,10 @@ export const main = dodgedMain<Params, Return>(async (ns: NS, params: Params) =>
 	for (const member of members) {
 		doEquipMember(ns, member, equipInfos, params.budget)
 	}
-	return { result: "Success" } as Return
+	return "success"
 })
 
-export const equipMembers = dodgedProxy<Params, Return>("lib/gang/equip-members.js")
+export const equipMembers = dodgedProxy<Params, string>("lib/gang/equip-members.js")
 
 function doEquipMember(ns: NS, member: GangMemberInfo, gangEquip: EquipInfo[], budget: number) {
 	let remainingBudget = budget

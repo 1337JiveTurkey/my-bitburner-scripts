@@ -10,7 +10,7 @@ import {NS} from "@ns"
 export function dodgedMain<P, R>(realMain: (ns: NS, params: P) => Promise<R>): (ns: NS) => Promise<void> {
 	return async (ns: NS) => {
 		if (ns.args.length !== 1) {
-			throw new Error("Wrong number of args given, was this called manually?")
+			throw new Error("Wrong number of args given. Was this called manually?")
 		}
 		const params = JSON.parse(ns.args[0].toString()) as P
 		const result = await realMain(ns, params)
@@ -33,7 +33,7 @@ export function dodgedProxy<P, R>(scriptName: string): (ns: NS, params: P) => Pr
 			await ns.nextPortWrite(pid)
 			return ns.readPort(pid) as R
 		} else {
-			throw new Error("Couldn't start process.")
+			throw new Error(`Couldn't start ${scriptName} process.`)
 		}
 	}
 }
