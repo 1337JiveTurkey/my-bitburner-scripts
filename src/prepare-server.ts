@@ -26,9 +26,9 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool): Promise<str
 			return "Server has no hack difficulty so can't be prepped"
 		}
 		const ratio = server.moneyMax / server.moneyAvailable
-
-		const growThreads = Math.ceil(ns.growthAnalyze(target, ratio))
-
+		const growThreads = Number.isFinite(ratio)?
+			Math.ceil(ns.growthAnalyze(target, ratio)) :
+			Math.floor(server.moneyMax)
 
 		const excessDifficulty = server.hackDifficulty - server.minDifficulty
 		const growthDifficulty = SEC_PER_GROW * growThreads
@@ -38,7 +38,9 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool): Promise<str
 
 		const growTime = ns.getGrowTime(target)
 		const weakTime = ns.getWeakenTime(target)
-		ns.tprintf("Grow Time: %s Weak Time: %s", ns.tFormat(growTime, false), ns.tFormat(weakTime, false))
+		ns.tprintf("Grow Time: %s Weak Time: %s",
+			ns.tFormat(growTime, false),
+			ns.tFormat(weakTime, false))
 
 		const growDelay = weakTime - growTime
 
