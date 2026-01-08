@@ -1,4 +1,6 @@
 import {GangMemberInfo, NS} from "@ns"
+import {ascendMembers} from "/lib/gang/ascend-members";
+import {equipMembers} from "/lib/gang/equip-members";
 
 const gangNames = [
 	"Adalberto",
@@ -48,14 +50,13 @@ export async function main(ns: NS) {
 		const gangMembers = ns.gang.getMemberNames()
 
 		const budget = ns.getPlayer().money / gangMembers.length
-		const gangEquip = getAllEquipInfo(ns)
-		for (const m of gangMembers) {
-			if (!flags["no-ascend"]) {
-				doAscendMember(ns, m)
-			}
-			if (!flags["no-equip"]) {
-				doEquipMember(ns, m, gangEquip, budget)
-			}
+
+		// Test of new dodged functions
+		if (!flags["no-equip"]) {
+			await equipMembers(ns, { members: gangMembers, budget })
+		}
+		if (!flags["no-ascend"]) {
+			await ascendMembers(ns, gangMembers)
 		}
 		if (!flags["no-warfare"]) {
 			doTerritoryWarfare(ns)
@@ -77,40 +78,6 @@ function doRecruitMembers(ns: NS) {
 		}
 		ns.gang.recruitMember(m)
 		ns.gang.setMemberTask(m, "Train Combat")
-	}
-}
-
-function doEquipMember(ns: NS, m: string, gangEquip: EquipInfo[], budget: number) {
-	let remainingBudget = budget
-	const info = ns.gang.getMemberInformation(m)
-	if (info.task.includes("Train")) {
-		return
-	}
-	const extant = new Set([...info.augmentations, ...info.upgrades])
-	for (const e of gangEquip) {
-		if (!extant.has(e.name)) {
-			if (e.cost < remainingBudget) {
-				remainingBudget -= e.cost
-				ns.gang.purchaseEquipment(m, e.name)
-			}
-		}
-	}
-}
-
-function doAscendMember(ns: NS, m: string) {
-	const info = ns.gang.getMemberInformation(m)
-	if (!info.task.includes("Train")) {
-		return
-	}
-	const result = ns.gang.getAscensionResult(m)
-	if (typeof result === "undefined") {
-		return
-	}
-	const increase = result.hack * result.str * result.def * result.dex * result.agi * result.cha
-	ns.print(m + " (" + info.task + "): " + increase)
-	if (increase > 4) {
-		ns.print("Ascending " + m)
-		ns.gang.ascendMember(m)
 	}
 }
 
@@ -139,28 +106,6 @@ function getMembers(ns: NS): Members {
 		members[m] = ns.gang.getMemberInformation(m)
 	}
 	return members
-}
-
-interface EquipInfo { name: string, cost: number, eType: string }
-
-function getAllEquipInfo(ns: NS): EquipInfo[] {
-	const gangEquip = ns.gang.getEquipmentNames()
-	const res = []
-	for (const e of gangEquip) {
-		const cost = ns.gang.getEquipmentCost(e)
-		const eType = ns.gang.getEquipmentType(e)
-		res.push({
-			name: e,
-			cost: cost,
-			eType: eType,
-		})
-	}
-	// Sort ascending by price for when we account for budgets
-	res.sort((a, b) => {
-		return a.cost - b.cost
-	})
-	//	ns.tprint(JSON.stringify(res, null, 2))
-	return res
 }
 
 interface TaskInfo {
