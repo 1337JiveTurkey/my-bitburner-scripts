@@ -10,8 +10,6 @@ export const main = dodgedMain<string[], string>(async (ns: NS, params: string[]
 	return ""
 })
 
-export const ascendMembers = dodgedProxy<string[], string>("lib/gang/ascend-members.js")
-
 function doAscendMember(ns: NS, member: GangMemberInfo) {
 	if (!member.task.includes("Train")) {
 		return

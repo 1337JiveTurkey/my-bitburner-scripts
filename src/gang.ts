@@ -1,6 +1,5 @@
 import {GangMemberInfo, NS} from "@ns"
-import {ascendMembers} from "/lib/gang/ascend-members";
-import {equipMembers} from "/lib/gang/equip-members";
+import {ascendMembers, equipMembers} from "/lib/gang/interface";
 
 const gangNames = [
 	"Adalberto",

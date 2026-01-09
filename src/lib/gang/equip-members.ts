@@ -1,12 +1,8 @@
 import {GangMemberInfo, NS} from "@ns"
-import {dodgedMain, dodgedProxy} from "lib/dodge-script"
+import {dodgedMain} from "lib/dodge-script"
+import {EquipParams} from "lib/gang/interface"
 
-interface Params {
-	budget: number
-	members: string[]
-}
-
-export const main = dodgedMain<Params, string>(async (ns: NS, params: Params) => {
+export const main = dodgedMain<EquipParams, string>(async (ns: NS, params: EquipParams) => {
 	const members = params.members.map(arg => ns.gang.getMemberInformation(arg))
 
 	const equipInfos = getAllEquipInfo(ns)
@@ -16,8 +12,6 @@ export const main = dodgedMain<Params, string>(async (ns: NS, params: Params) =>
 	}
 	return "success"
 })
-
-export const equipMembers = dodgedProxy<Params, string>("lib/gang/equip-members.js")
 
 function doEquipMember(ns: NS, member: GangMemberInfo, gangEquip: EquipInfo[], budget: number) {
 	let remainingBudget = budget
