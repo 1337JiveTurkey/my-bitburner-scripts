@@ -21,7 +21,7 @@ export async function main(ns: NS) {
 		}
 	}
 	const newArgs = ["--server", ...args.slice(1)]
-	ns.spawn(service, {}, ...newArgs)
+	ns.spawn(service, {spawnDelay: 10}, ...newArgs)
 }
 
 function loadConfig(ns: NS) {
