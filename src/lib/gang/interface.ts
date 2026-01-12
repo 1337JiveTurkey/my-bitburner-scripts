@@ -1,5 +1,4 @@
-import {dodgedProxy} from "/lib/dodge-script";
-
+import dodgedProxy from "/lib/dodge-proxy";
 
 export const ascendMembers = dodgedProxy<string[], string>("lib/gang/ascend-members.js")
 
