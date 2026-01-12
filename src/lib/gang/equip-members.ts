@@ -1,5 +1,5 @@
 import {GangMemberInfo, NS} from "@ns"
-import {dodgedMain} from "lib/dodge-script"
+import dodgedMain from "lib/dodge-script"
 import {EquipParams} from "lib/gang/interface"
 
 export const main = dodgedMain<EquipParams, string>(async (ns: NS, params: EquipParams) => {

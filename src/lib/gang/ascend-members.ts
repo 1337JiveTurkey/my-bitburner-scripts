@@ -1,5 +1,5 @@
 import {GangMemberInfo, NS} from "@ns"
-import {dodgedMain, dodgedProxy} from "lib/dodge-script"
+import dodgedMain from "lib/dodge-script"
 
 export const main = dodgedMain<string[], string>(async (ns: NS, params: string[]) => {
 	const members = params.map(arg => ns.gang.getMemberInformation(arg))
