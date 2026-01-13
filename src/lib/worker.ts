@@ -219,7 +219,7 @@ abstract class ExecutableTask implements WorkerTask {
 	readonly threads: number
 	readonly delay: number
 
-	protected constructor(target: string, threads: number, delay: number) {
+	constructor(target: string, threads: number, delay: number) {
 		this.target = target
 		this.threads = threads
 		this.delay = delay
@@ -235,9 +235,6 @@ abstract class ExecutableTask implements WorkerTask {
 export class HackTask extends ExecutableTask {
 	readonly baseRam: number = 1.70
 
-	constructor(target: string, threads: number, delay: number) {
-		super(target, threads, delay)
-	}
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		promises.push(worker.hack(this.target, this.threads * scaling, this.delay))
 	}
@@ -246,9 +243,6 @@ export class HackTask extends ExecutableTask {
 export class GrowTask extends ExecutableTask {
 	readonly baseRam: number = 1.75
 
-	constructor(target: string, threads: number, delay: number) {
-		super(target, threads, delay)
-	}
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		promises.push(worker.grow(this.target, this.threads * scaling, this.delay))
 	}
@@ -257,9 +251,6 @@ export class GrowTask extends ExecutableTask {
 export class WeakenTask extends ExecutableTask {
 	readonly baseRam: number = 1.75
 
-	constructor(target: string, threads: number, delay: number) {
-		super(target, threads, delay)
-	}
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		promises.push(worker.weaken(this.target, this.threads * scaling, this.delay))
 	}
