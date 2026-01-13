@@ -23,6 +23,32 @@ export default class BatchExecutor {
 		this.#log.info("Created BatchExecutor with " + this.#pool.workers.length + " workers.")
 	}
 
+	/**
+	 * Estimates the best possible batch for the worker pool available
+	 *
+	 * @param batches The possible batches to execute
+	 */
+	bestBatch(batches: BatchStats[]): BatchStats|null {
+		let bestTotal = 0
+		let bestBatch = null
+		for (const batch of batches) {
+			const total = this.estimateTotal(batch)
+			if (total > bestTotal) {
+				bestTotal = total
+				bestBatch = batch
+			}
+		}
+
+		return bestBatch
+	}
+
+	estimateTotal(batch: BatchStats): number {
+		const ramLimited = this.#pool.numberOfInstances(batch.batchRam)
+		const countLimited = 200000 / 3
+		const batches = Math.min(ramLimited, countLimited)
+		return batch.hackMoney * batches
+	}
+
 	async runOnWorkers(batch: BatchStats) {
 		const target = batch.target
 		const hostname = target.hostname

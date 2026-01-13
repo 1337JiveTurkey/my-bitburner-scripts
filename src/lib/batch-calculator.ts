@@ -260,7 +260,7 @@ export default class BatchCalculator implements TargetStats {
 	}
 
 	/**
-	 * Calculates the ratios of
+	 * Calculates the ratios of threads needed for server prep.
 	 */
 	calculatePrep() {
 		this.#log.fine("Calculating prep estimates")

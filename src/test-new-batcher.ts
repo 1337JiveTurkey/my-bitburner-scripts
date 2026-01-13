@@ -5,8 +5,11 @@ import BatchExecutor from "lib/batch-executor"
 import {batchCompare, BatchStats, batchTable} from "lib/batch-stats"
 
 export async function main(ns: NS) {
+	const flags = ns.flags([
+		["list", false]
+	])
 	ns.disableLog("ALL")
-	const log = new Log(ns).toTerminal().level("FINE")
+	const log = new Log(ns).toTerminal().level("INFO")
 
 	const calculator = new BatchCalculator(ns, ns.args[0].toString(), log)
 	const executor = new BatchExecutor(ns, log)
@@ -14,15 +17,24 @@ export async function main(ns: NS) {
 	const possibleBatches: BatchStats[] = calculator.calculateEstimates()
 
 	possibleBatches.sort(batchCompare)
-	const estimatesTable = batchTable(possibleBatches)
-	estimatesTable.printToTerminal(ns)
-	log.info("Going with %s", ns.formatPercent(possibleBatches[0].hackPercent))
+	if (flags["list"]) {
+		const estimatesTable = batchTable(possibleBatches)
+		estimatesTable.printToTerminal(ns)
+	}
 
-	await executor.runOnWorkers(possibleBatches[0])
+	// Get best batch if any for the worker pool
+	const bestBatch = executor.bestBatch(possibleBatches)
+	if (bestBatch) {
+		log.info("Going with %s", ns.formatPercent(bestBatch.hackPercent))
 
-	// This script had better exist
-	log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
-	if (calculator.needsPrep()) {
-		log.warn("Server needs prep after test run")
+		await executor.runOnWorkers(possibleBatches[0])
+
+		// This script had better exist
+		log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
+		if (calculator.needsPrep()) {
+			log.warn("Server needs prep after test run")
+		}
+	} else {
+		log.warn("%s", "No best batch found")
 	}
 }
