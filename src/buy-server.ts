@@ -1,4 +1,4 @@
-import {NS, ScriptArg} from "@ns"
+import {NS} from "@ns"
 
 export async function main(ns: NS) {
 	const flags = ns.flags([
@@ -129,9 +129,6 @@ function biggestPurchaseForBudget(ns: NS, budget: number) {
 	}
 }
 
-/** @param {NS} ns
- *  @param {string} hostname
- *  @param {number} budget **/
 function biggestUpgradeForBudget(ns: NS, hostname: string, budget: number) {
 	const baseSize = ns.getServerMaxRam(hostname)
 	let size = ns.getPurchasedServerMaxRam()
@@ -151,7 +148,6 @@ function biggestUpgradeForBudget(ns: NS, hostname: string, budget: number) {
 	}
 }
 
-/** @param {NS} ns **/
 function purchaseNextServer(ns: NS, size: number) {
 	const prefix = "cluster-"
 	for (let i = 0; i < ns.getPurchasedServerLimit(); i++) {
@@ -169,13 +165,4 @@ function purchaseNextServer(ns: NS, size: number) {
 		}
 	}
 	return ""
-}
-
-export function autocomplete(data: {
-	servers: string[],
-	scripts: string[]
-	txts: string[],
-	flags: (schema: [string, string | number | boolean | string[]][]) => { [key: string]: ScriptArg | string[] }
-}, args: string[]) {
-	return [...data.servers];
 }
