@@ -1,6 +1,6 @@
 import {NS, ScriptArg} from "@ns"
 
-import { getServerStateMap, ServerState } from "srv/server-state"
+import { getServers} from "/lib/servers/interface";
 
 const factionTargets = new Set(["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z"])
 const finalTargets = new Set(["w0r1d_d43m0n"])
@@ -15,8 +15,8 @@ export async function main(ns: NS) {
 
 	const hacking = ns.getPlayer().skills.hacking
 
-	const servers = getServerStateMap(ns)
-	for (const [hostname, server] of servers) {
+	const servers = await getServers(ns, {})
+	for (const [hostname, server] of Object.entries(servers)) {
 		const isTarget  = targets.has(hostname)
 		const canHack   = server.requiredHackingSkill <= hacking
 		const portsOpen = server.hasAdminRights
@@ -26,7 +26,7 @@ export async function main(ns: NS) {
 			// Will always be a string so long as we don't have "home" as a target
 			while (parent && parent !== "home") {
 				path.unshift(parent)
-				const parentServer = servers.get(parent) as ServerState
+				const parentServer = servers[parent]
 				parent = parentServer.parent
 			}
 			for (const step of path) {

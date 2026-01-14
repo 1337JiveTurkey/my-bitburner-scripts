@@ -74,7 +74,7 @@ export async function main(ns: NS) {
 
 function recursiveScan(ns: NS): string[] {
 	const hostnames = new Set<string>()
-	recurse(ns, ns.getHostname(), hostnames)
+	recurse(ns, ns.self().server, hostnames)
 	return [...hostnames]
 }
 
@@ -145,15 +145,6 @@ export function getServerState(ns: NS): ServerState[] {
 	} else {
 		return JSON.parse(state)
 	}
-}
-
-export function getServerStateMap(ns: NS): Map<string, ServerState> {
-	const retVal: Map<string, ServerState> = new Map()
-	const servers = getServerState(ns)
-	for (const server of servers) {
-		retVal.set(server.hostname, server)
-	}
-	return retVal
 }
 
 export interface ServerState {
