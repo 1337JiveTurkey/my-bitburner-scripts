@@ -1,4 +1,4 @@
-import { NS } from "@ns"
+import {NS, ScriptArg} from "@ns"
 import Log from "lib/logging"
 import BatchCalculator from "lib/batch-calculator"
 import BatchExecutor from "lib/batch-executor"
@@ -27,9 +27,8 @@ export async function main(ns: NS) {
 	if (bestBatch) {
 		log.info("Going with %s", ns.formatPercent(bestBatch.hackPercent))
 
-		await executor.runOnWorkers(possibleBatches[0])
+		await executor.runOnWorkers(bestBatch)
 
-		// This script had better exist
 		log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
 		if (calculator.needsPrep()) {
 			log.warn("Server needs prep after test run")
@@ -37,4 +36,13 @@ export async function main(ns: NS) {
 	} else {
 		log.warn("%s", "No best batch found")
 	}
+}
+
+export function autocomplete(data: {
+	servers: string[],
+	scripts: string[]
+	txts: string[],
+	flags: (schema: [string, string | number | boolean | string[]][]) => { [key: string]: ScriptArg | string[] }
+}, args: string[]) {
+	return [...data.servers]
 }
