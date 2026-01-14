@@ -11,6 +11,30 @@ export interface BuyServersResults {
 
 export const buyServers = dodgedProxy<BuyServersParams, BuyServersResults>("lib/servers/buy-servers.js")
 
+export interface ServerStats {
+	hostname: string
+	parent?: string
+	children: string[]
+	hasAdminRights: boolean
+	hasBackdoor: boolean
+	maxRam: number
+	minDifficulty: number
+	moneyMax: number
+	purchasedByPlayer: boolean
+	isHome: boolean
+	isPserv: boolean
+	isHacknet: boolean
+	isHacked: boolean
+	requiredHackingSkill: number
+}
+
+export interface GetServersParams {}
+
+export interface GetServersResults {[hostname: string]: ServerStats}
+
+export const getServers = dodgedProxy<GetServersParams, GetServersResults>("lib/servers/get-servers.js")
+
+
 export interface OpenPortsParams {
 	budget: number
 }
