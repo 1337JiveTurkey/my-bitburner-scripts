@@ -51,7 +51,7 @@ export default class BladeburnerAction {
 	}
 
 	get rankRequirementMet(): boolean {
-		return this.rankRequired >= this.#bb.getRank()
+		return this.rankRequired <= this.#bb.getRank()
 	}
 
 	get running(): boolean {
