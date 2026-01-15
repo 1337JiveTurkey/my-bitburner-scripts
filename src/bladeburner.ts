@@ -1,27 +1,25 @@
 import {
-	BladeburnerActionName,
-	BladeburnerActionType,
 	BladeburnerSkillName,
-	CityName,
 	NS,
 } from "@ns"
 import BladeburnerAction from "/lib/bladeburner-action"
-import Table from "lib/tables"
 
 export async function main(ns: NS) {
 	while(true) {
-		const skillsToBuy = analyzeActions(ns)
+		const nextAction = selectAction(ns)
+		const skillsToBuy = selectSkills(ns)
 		if (buySkills(ns, skillsToBuy)) {
 			ns.printf("Buying Skills!!!!!")
-		} else {
-			await ns.bladeburner.nextUpdate()
 		}
-		
+
+		nextAction.start()
+		await nextActionComplete(ns)
 	}
 }
 
 const MONEY: BladeburnerSkillName[] = ["Hands of Midas"] as BladeburnerSkillName[]
 const HYPERDRIVE: BladeburnerSkillName[] = ["Hyperdrive"] as BladeburnerSkillName[]
+const OVERCLOCK: BladeburnerSkillName[] = ["Overclock"] as BladeburnerSkillName[]
 const STAT_BOOSTERS: BladeburnerSkillName[] = ["Reaper", "Evasive System"] as BladeburnerSkillName[]
 const CHANCE_BOOSTERS: BladeburnerSkillName[] =
 	["Blade's Intuition", "Cloak", "Short-Circuit", "Digital Observer"] as BladeburnerSkillName[]
@@ -36,7 +34,9 @@ function buySkills(ns: NS, skills: BladeburnerSkillName[]): boolean {
 			maxLevel = level
 		}
 	}
-	const newLevel = maxLevel + 10
+	const newLevel: number = maxLevel >= 1000? maxLevel + 100 :
+	                         maxLevel >= 100?  maxLevel + 10  :
+	                                           maxLevel + 1
 	let totalCost = 0
 	for (const skill of skills) {
 		const level = bb.getSkillLevel(skill)
@@ -53,21 +53,78 @@ function buySkills(ns: NS, skills: BladeburnerSkillName[]): boolean {
 	}
 }
 
-function getOrderOfMagnitude(skill: number):number {
-	return Math.pow(10, Math.ceil(Math.log10(skill)))
+function selectAction(ns: NS): BladeburnerAction {
+	const bb = ns.bladeburner
+
+	const [current, max] = bb.getStamina()
+	if (current < max / 2) {
+		return BladeburnerAction.regeneration(ns)
+	}
+
+	// Top priority is Black Ops if we can do them
+	const blackOp = BladeburnerAction.nextBlackOp(ns)
+	if (blackOp) {
+		const [low, high] = blackOp.chances
+		const sufficientRank = blackOp.rankRequirementMet
+		if (low === 1 && sufficientRank) {
+			return blackOp
+		}
+	}
+
+	if (bb.getCityChaos(bb.getCity()) > 50) {
+		return BladeburnerAction.diplomacy(ns)
+	}
+
+	const actionsByPriority = [
+		BladeburnerAction.assassination(ns),
+		BladeburnerAction.undercoverOp(ns),
+		BladeburnerAction.investigation(ns),
+		BladeburnerAction.tracking(ns)
+	]
+
+	for (const action of actionsByPriority) {
+		const [low, high] = action.chances
+		const remaining = action.countRemaining
+		if (low === 1 && remaining > 0) {
+			return action
+		}
+	}
+
+	return BladeburnerAction.training(ns)
 }
 
-function analyzeActions(ns: NS): BladeburnerSkillName[] {
-	const assassination = new BladeburnerAction(ns,
-		"Operations" as BladeburnerActionType,
-		"Assassination" as BladeburnerActionName)
+function selectSkills(ns: NS): BladeburnerSkillName[] {
+	const assassination = BladeburnerAction.assassination(ns)
+	let current = BladeburnerAction.current(ns)?? assassination
+
+	let skillPriority: BladeburnerSkillName[]
 	const [_, high] = assassination.chances
-	if (high < 1) {
-		return CHANCE_BOOSTERS
-	}
 	const time = assassination.time / 1000
-	if (time > 15) {
-		return STAT_BOOSTERS
+	if (high < 1) {
+		skillPriority = CHANCE_BOOSTERS
+	} else if (time > 15) {
+		if (ns.bladeburner.getSkillLevel("Overclock") < 90) {
+			skillPriority = OVERCLOCK
+		}
+		else {
+			skillPriority = STAT_BOOSTERS
+		}
+	} else {
+		skillPriority = HYPERDRIVE
 	}
-	return HYPERDRIVE
+	return skillPriority
+}
+
+
+async function nextActionComplete(ns: NS): Promise<void> {
+	let current = ns.bladeburner.getCurrentAction()
+	while (current) {
+		const timeWaited = await ns.bladeburner.nextUpdate()
+		const timeSpent = ns.bladeburner.getActionCurrentTime()
+		// Action time should increment in seconds
+		if (timeSpent < timeWaited) {
+			return
+		}
+		current = ns.bladeburner.getCurrentAction()
+	}
 }

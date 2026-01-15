@@ -50,6 +50,10 @@ export default class BladeburnerAction {
 		}
 	}
 
+	get rankRequirementMet(): boolean {
+		return this.rankRequired >= this.#bb.getRank()
+	}
+
 	get running(): boolean {
 		const currentAction = this.#bb.getCurrentAction()
 		return currentAction !== null &&
@@ -103,5 +107,53 @@ export default class BladeburnerAction {
 		return new BladeburnerAction(ns,
 			"Black Operations" as BladeburnerActionType,
 			nextAction.name as BladeburnerActionName,)
+	}
+
+	static training(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"General" as BladeburnerActionType,
+			"Training" as BladeburnerActionName)
+	}
+
+	static analysis(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"General" as BladeburnerActionType,
+			"Field Analysis" as BladeburnerActionName)
+	}
+
+	static diplomacy(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"General" as BladeburnerActionType,
+			"Diplomacy" as BladeburnerActionName)
+	}
+
+	static regeneration(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"General" as BladeburnerActionType,
+			"Hyperbolic Regeneration Chamber" as BladeburnerActionName)
+	}
+
+	static tracking(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"Contracts" as BladeburnerActionType,
+			"Tracking" as BladeburnerActionName)
+	}
+
+	static investigation(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"Operations" as BladeburnerActionType,
+			"Investigation" as BladeburnerActionName)
+	}
+
+	static undercoverOp(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"Operations" as BladeburnerActionType,
+			"Undercover Operation" as BladeburnerActionName)
+	}
+
+	static assassination(ns: NS): BladeburnerAction {
+		return new BladeburnerAction(ns,
+			"Operations" as BladeburnerActionType,
+			"Assassination" as BladeburnerActionName)
 	}
 }
