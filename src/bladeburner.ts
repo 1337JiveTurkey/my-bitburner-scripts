@@ -84,6 +84,9 @@ function selectAction(ns: NS): BladeburnerAction {
 
 	for (const action of actionsByPriority) {
 		const [low, high] = action.chances
+		if (low !== high) {
+			return BladeburnerAction.analysis(ns)
+		}
 		const remaining = action.countRemaining
 		if (low === 1 && remaining > 0) {
 			return action
@@ -98,9 +101,9 @@ function selectSkills(ns: NS): BladeburnerSkillName[] {
 	let current = BladeburnerAction.current(ns)?? assassination
 
 	let skillPriority: BladeburnerSkillName[]
-	const [_, high] = assassination.chances
+	const [low, high] = assassination.chances
 	const time = assassination.time / 1000
-	if (high < 1) {
+	if (low < 1) {
 		skillPriority = CHANCE_BOOSTERS
 	} else if (time > 15) {
 		if (ns.bladeburner.getSkillLevel("Overclock") < 90) {
