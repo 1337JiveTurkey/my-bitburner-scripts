@@ -16,7 +16,8 @@ export default class BatchCalculator implements TargetStats {
 
 	#log: Log
 
-	#useFormulas: boolean
+	readonly #useFormulas: boolean
+	padding: number = 0
 
 	hostname = ""
 	hackRam = 0
@@ -89,6 +90,21 @@ export default class BatchCalculator implements TargetStats {
 	}
 
 	/**
+	 * Pads grow and weaken threads, including the ceiling that both need.
+	 * @param p The number of threads to begin with.
+	 */
+	pad(p: number): number {
+		if (this.padding) {
+			const padded = Math.ceil(p * (this.padding + 1))
+			const plusOne = Math.ceil(p + 1)
+			return Math.max(padded, plusOne)
+		}
+		else {
+			return Math.ceil(p)
+		}
+	}
+
+	/**
 	 * Get the BatchStats for a batch getting a specific percentage of the server's money.
 	 * Now computes the actual percentage of the server targeted.
 	 */
@@ -108,8 +124,8 @@ export default class BatchCalculator implements TargetStats {
 		const targetMoney = moneyMax * percent
 
 		const hackThreads = Math.floor(this.#ns.hackAnalyzeThreads(this.hostname, targetMoney))
-		const growThreads = Math.ceil(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - targetMoney)))
-		const weakThreads = Math.ceil((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
+		const growThreads = this.pad(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - targetMoney)))
+		const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
 
 		const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 		const hackMoney = perThreadMoney * hackThreads
@@ -141,9 +157,9 @@ export default class BatchCalculator implements TargetStats {
 		const hackMoney = perThreadMoney * hackThreads
 		s.moneyAvailable! -= hackMoney
 		s.hackDifficulty! += SEC_PER_HACK * hackThreads
-		const growThreads = Math.ceil(h.growThreads(s, p, moneyMax))
+		const growThreads = this.pad(h.growThreads(s, p, moneyMax))
 		s.hackDifficulty! += SEC_PER_GROW * growThreads
-		const weakThreads = Math.ceil((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
+		const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
 
 		const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
@@ -181,8 +197,8 @@ export default class BatchCalculator implements TargetStats {
 			if (hackMoney >= moneyMax) {
 				break
 			}
-			const growThreads = Math.ceil(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - hackMoney)))
-			const weakThreads = Math.ceil((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_HACK)
+			const growThreads = this.pad(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - hackMoney)))
+			const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_HACK)
 			const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
 			if (batchRam > maxRam && maxRam > 0) {
@@ -228,9 +244,9 @@ export default class BatchCalculator implements TargetStats {
 			}
 			s.moneyAvailable! -= hackMoney
 			s.hackDifficulty! += SEC_PER_HACK * hackThreads
-			const growThreads = Math.ceil(h.growThreads(s, p, moneyMax))
+			const growThreads = this.pad(h.growThreads(s, p, moneyMax))
 			s.hackDifficulty! += SEC_PER_GROW * growThreads
-			const weakThreads = Math.ceil((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
+			const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
 			const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
 			if (batchRam > maxRam && maxRam > 0) {

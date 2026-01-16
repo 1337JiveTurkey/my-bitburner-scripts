@@ -1,4 +1,4 @@
-import {NS, ScriptArg} from "@ns"
+import {AutocompleteData, NS} from "@ns"
 import Log from "lib/logging"
 import BatchCalculator from "lib/batch-calculator"
 import BatchExecutor from "lib/batch-executor"
@@ -8,10 +8,12 @@ export async function main(ns: NS) {
 	const flags = ns.flags([
 		["list", false]
 	])
+	const hostname = flags["_"].toString()
 	ns.disableLog("ALL")
 	const log = new Log(ns).toTerminal().level("INFO")
 
-	const calculator = new BatchCalculator(ns, ns.args[0].toString(), log)
+	const calculator = new BatchCalculator(ns, hostname, log)
+	calculator.padding = .1
 	const executor = new BatchExecutor(ns, log)
 	
 	const possibleBatches: BatchStats[] = calculator.calculateEstimates()
@@ -38,11 +40,6 @@ export async function main(ns: NS) {
 	}
 }
 
-export function autocomplete(data: {
-	servers: string[],
-	scripts: string[]
-	txts: string[],
-	flags: (schema: [string, string | number | boolean | string[]][]) => { [key: string]: ScriptArg | string[] }
-}, args: string[]) {
+export function autocomplete(data: AutocompleteData, args: string[]) {
 	return [...data.servers]
 }
