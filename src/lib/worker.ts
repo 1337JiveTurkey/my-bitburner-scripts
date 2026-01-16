@@ -5,6 +5,7 @@ const HACK_WORKER = "workers/hack.js"
 const GROW_WORKER = "workers/grow.js"
 const WEAKEN_WORKER = "workers/weaken.js"
 const SHARE_WORKER = "workers/share.js"
+const CHARGE_WORKER = "workers/charge.js"
 
 const MAX_SCRIPTS = 200000
 
@@ -26,7 +27,7 @@ export class Worker {
 		this.maxRam = maxRam
 
 		if (hostname !== "home") {
-			ns.scp([HACK_WORKER, GROW_WORKER, WEAKEN_WORKER, SHARE_WORKER], hostname)
+			ns.scp([HACK_WORKER, GROW_WORKER, WEAKEN_WORKER, SHARE_WORKER, CHARGE_WORKER], hostname)
 		}
 	}
 
@@ -40,7 +41,7 @@ export class Worker {
 	           threads: number,
 	           delay: number,
 	           stockType: string): Promise<number> {
-		const pid = this.#ns.exec(tool,
+		const pid: number = this.#ns.exec(tool,
 		                                  this.hostname,
 		                                  { threads: threads, temporary: true },
 		                                  target,
@@ -66,7 +67,7 @@ export class Worker {
 	}
 
 	async share(threads: number): Promise<void> {
-		const pid = this.#ns.exec(SHARE_WORKER,
+		const pid: number = this.#ns.exec(SHARE_WORKER,
 		                                  this.hostname,
 		                                  { threads: threads, temporary: true })
 		if (pid) {
@@ -74,6 +75,19 @@ export class Worker {
 			return this.#ns.readPort(pid)
 		} else {
 			throw new Error("Failed to start " + SHARE_WORKER)
+		}
+	}
+
+	async charge(threads: number, params: [number, number][]): Promise<number> {
+		const pid: number = this.#ns.exec(CHARGE_WORKER,
+		                                  this.hostname,
+		                                  { threads: threads, temporary: true },
+		                                  JSON.stringify(params))
+		if (pid) {
+			await this.#ns.nextPortWrite(pid)
+			return this.#ns.readPort(pid)
+		} else {
+			throw new Error("Failed to start " + CHARGE_WORKER)
 		}
 	}
 
