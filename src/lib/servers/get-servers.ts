@@ -2,7 +2,7 @@ import {NS} from "@ns"
 import dodgedMain from "lib/dodge-script"
 import {GetServersParams, GetServersResults, ServerStats} from "lib/servers/interface"
 
-export const main = dodgedMain<GetServersParams, GetServersResults>(async (ns: NS, p: GetServersParams) => {
+export const main: (ns: NS) => Promise<void> = dodgedMain<GetServersParams, GetServersResults>(async (ns: NS, p: GetServersParams) => {
 	const hostnames = recursiveScan(ns)
 	const servers = hostnames.map(hostname => ns.getServer(hostname))
 	const jsonServers: GetServersResults = {}
@@ -34,7 +34,7 @@ export const main = dodgedMain<GetServersParams, GetServersResults>(async (ns: N
 			isHacked: !server.purchasedByPlayer && hasAdminRights,
 			requiredHackingSkill: server.requiredHackingSkill || 0
 		}
-		jsonServers[server.hostname] = jsonServer
+		jsonServers[jsonServer.hostname] = jsonServer
 	}
 	return jsonServers
 })

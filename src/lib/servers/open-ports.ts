@@ -10,7 +10,7 @@ const PORT_OPENERS = [
 	"SQLInject.exe"
 ]
 
-export const main = dodgedMain<OpenPortsParams, OpenPortsResults>(async (ns: NS, p: OpenPortsParams) => {
+export const main: (ns: NS) => Promise<void> = dodgedMain<OpenPortsParams, OpenPortsResults>(async (ns: NS, p: OpenPortsParams) => {
 	const budget = p.budget
 	let budgetRemaining = budget? budget: ns.getPlayer().money
 
@@ -34,31 +34,11 @@ export const main = dodgedMain<OpenPortsParams, OpenPortsResults>(async (ns: NS,
 			}
 		}
 	}
-	for (const hostname of recursiveScan(ns)) {
-		const server = ns.getServer(hostname)
-		soften(ns, server)
-
-	}
 	return {
 		openedServers: [""],
 		canOpenMore: true
 	}
 })
-
-function recursiveScan(ns: NS): string[] {
-	const hostnames = new Set<string>()
-	recurse(ns, ns.self().server, hostnames)
-	return [...hostnames]
-}
-
-function recurse(ns: NS, hostname: string, hostnames: Set<string>) {
-	if (!hostnames.has(hostname)) {
-		hostnames.add(hostname)
-		for (const child of ns.scan(hostname)) {
-			recurse(ns, child, hostnames)
-		}
-	}
-}
 
 /**
  *  Pound the server's ports into submission. Doesn't matter how many ports
