@@ -121,7 +121,7 @@ function selectSkills(ns: NS): BladeburnerSkillName[] {
 
 async function nextActionComplete(ns: NS): Promise<void> {
 	let current = ns.bladeburner.getCurrentAction()
-	while (current) {
+	do {
 		const timeWaited = await ns.bladeburner.nextUpdate()
 		const timeSpent = ns.bladeburner.getActionCurrentTime()
 		// Action time should increment in seconds
@@ -129,5 +129,5 @@ async function nextActionComplete(ns: NS): Promise<void> {
 			return
 		}
 		current = ns.bladeburner.getCurrentAction()
-	}
+	} while (current)
 }
