@@ -3,6 +3,7 @@ import Log from "lib/logging"
 import BatchCalculator from "lib/batch-calculator"
 import BatchExecutor from "lib/batch-executor"
 import {batchCompare, BatchStats, batchTable} from "lib/batch-stats"
+import {prepareServer} from "/lib/hacking/interface";
 
 export async function main(ns: NS) {
 	const flags = ns.flags([
@@ -34,12 +35,14 @@ export async function main(ns: NS) {
 		log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
 		if (calculator.needsPrep()) {
 			log.warn("Server needs prep after test run")
+			const {result} = await prepareServer(ns, {hostname})
+			log.info("%s", result)
 		}
 	} else {
 		log.warn("%s", "No best batch found")
 	}
 }
 
-export function autocomplete(data: AutocompleteData, args: string[]) {
+export function autocomplete(data: AutocompleteData) {
 	return [...data.servers]
 }
