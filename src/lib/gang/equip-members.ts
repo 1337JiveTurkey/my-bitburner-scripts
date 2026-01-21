@@ -10,7 +10,7 @@ export const main = dodgedMain<EquipParams, string>(async (ns: NS, params: Equip
 	for (const member of members) {
 		doEquipMember(ns, member, equipInfos, params.budget)
 	}
-	return "success"
+	return "Equipped Members"
 })
 
 function doEquipMember(ns: NS, member: GangMemberInfo, gangEquip: EquipInfo[], budget: number) {

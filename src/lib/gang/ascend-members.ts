@@ -7,7 +7,7 @@ export const main = dodgedMain<string[], string>(async (ns: NS, params: string[]
 	for (const member of members) {
 		doAscendMember(ns, member)
 	}
-	return ""
+	return "Ascended Members"
 })
 
 function doAscendMember(ns: NS, member: GangMemberInfo) {

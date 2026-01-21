@@ -1,5 +1,6 @@
 import {GangMemberInfo, NS} from "@ns"
-import {ascendMembers, equipMembers} from "/lib/gang/interface";
+import {GangInterface} from "/lib/gang/interface";
+import Log from "/lib/logging";
 
 const gangNames = [
 	"Adalberto",
@@ -34,11 +35,14 @@ export async function main(ns: NS) {
 		["no-warfare", false],
 	])
 
+	const log = new Log(ns).level("FINE").toTail()
+	const gang = new GangInterface(ns, log)
+
 	if (!ns.gang.inGang()) {
 		if (ns.heart.break() <= -54000) {
 			ns.gang.createGang(ns.enums.FactionName.SlumSnakes)
 		} else {
-			ns.tprintf("Couldn't create gang Slum Snakes")
+			log.error("Couldn't create gang Slum Snakes")
 			return
 		}
 	}
@@ -52,10 +56,10 @@ export async function main(ns: NS) {
 
 		// Test of new dodged functions
 		if (!flags["no-equip"]) {
-			await equipMembers(ns, { members: gangMembers, budget })
+			log.info(await gang.equipMembers({ members: gangMembers, budget }))
 		}
 		if (!flags["no-ascend"]) {
-			await ascendMembers(ns, gangMembers)
+			log.info(await gang.ascendMembers(gangMembers))
 		}
 		if (!flags["no-warfare"]) {
 			doTerritoryWarfare(ns)

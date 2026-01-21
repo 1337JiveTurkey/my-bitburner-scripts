@@ -14,6 +14,9 @@ export default function dodgedMain<P, R>(realMain: (ns: NS, params: P) => Promis
 		}
 		const params = JSON.parse(ns.args[0].toString()) as P
 		const result = await realMain(ns, params)
-		ns.writePort(ns.pid, result)
+		ns.writePort(ns.pid, {
+			tag: "success",
+			result
+		})
 	}
 }
