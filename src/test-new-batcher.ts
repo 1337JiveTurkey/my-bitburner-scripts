@@ -3,15 +3,16 @@ import Log from "lib/logging"
 import BatchCalculator from "lib/batch-calculator"
 import BatchExecutor from "lib/batch-executor"
 import {batchCompare, BatchStats, batchTable} from "lib/batch-stats"
-import {prepareServer} from "/lib/hacking/interface";
+import {HackingInterface} from "/lib/hacking/interface";
 
 export async function main(ns: NS) {
+	ns.disableLog("ALL")
 	const flags = ns.flags([
 		["list", false]
 	])
 	const hostname = flags["_"].toString()
-	ns.disableLog("ALL")
 	const log = new Log(ns).toTerminal().level("INFO")
+	const hacking = new HackingInterface(ns, log)
 
 	const calculator = new BatchCalculator(ns, hostname, log)
 	calculator.padding = .1
@@ -35,7 +36,7 @@ export async function main(ns: NS) {
 		log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
 		if (calculator.needsPrep()) {
 			log.warn("Server needs prep after test run")
-			const {result} = await prepareServer(ns, {hostname})
+			const {result} = await hacking.prepareServer({hostname})
 			log.info("%s", result)
 		}
 	} else {

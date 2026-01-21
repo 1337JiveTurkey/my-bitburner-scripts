@@ -1,5 +1,4 @@
-import {NS} from "@ns"
-import dodgedProxy from "/lib/dodge-proxy";
+import DodgeInterface from "/lib/dodge-interface";
 
 export interface PrepareServerParams {
 	hostname: string
@@ -9,5 +8,8 @@ export interface PrepareServerResults {
 	result: string
 }
 
-export const prepareServer: (ns: NS, params: PrepareServerParams) => Promise<PrepareServerResults> =
-	dodgedProxy<PrepareServerParams, PrepareServerResults>("lib/hacking/prepare-server.js")
+export class HackingInterface extends DodgeInterface {
+	async prepareServer(params: PrepareServerParams): Promise<PrepareServerResults> {
+		return await this.dodgeCall(params, "lib/hacking/prepare-server.js")
+	}
+}
