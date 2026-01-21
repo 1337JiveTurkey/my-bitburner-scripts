@@ -1,6 +1,5 @@
-import { NS } from "@ns"
+import {NS, Server} from "@ns"
 import Log from "lib/logging"
-import Table from "lib/tables"
 import { TargetStats, BatchStats } from "lib/batch-stats"
 
 const SEC_PER_HACK = 0.002
@@ -275,49 +274,22 @@ export default class BatchCalculator implements TargetStats {
 		return s.moneyAvailable !== s.moneyMax && s.hackDifficulty !== s.minDifficulty
 	}
 
-	/**
-	 * Calculates the ratios of threads needed for server prep.
-	 */
-	calculatePrep() {
-		this.#log.fine("Calculating prep estimates")
-		if (this.#useFormulas) {
-			return this.#calculatePrepFormula()
-		} else {
-			return this.#calculatePrep()
+	moneyPrep(): number {
+		const s = this.#ns.getServer(this.hostname)
+		if (!s.moneyMax || !s.moneyAvailable) {
+			return -1
 		}
+		const moneyDeficit = s.moneyMax - s.moneyAvailable
+		return 1 - moneyDeficit / s.moneyMax
 	}
 
-	#calculatePrep() {
+	securityPrep(): number {
 		const s = this.#ns.getServer(this.hostname)
-		const moneyMax = s.moneyMax!
-		const moneyAvailable = s.moneyAvailable!
-
-		// Special case when the multiplier is infinite
-		if (!moneyAvailable) {
-
+		if (!s.hackDifficulty || !s.minDifficulty) {
+			return -1
 		}
-
-		return {
-			target: this
-		}
-	}
-
-	#calculatePrepFormula() {
-		const h = this.#ns.formulas.hacking
-		const s = this.#ns.getServer(this.hostname)
-		const p = this.#ns.getPlayer()
-
-		const moneyMax = s.moneyMax!
-		const moneyAvailable = s.moneyAvailable!
-
-		const growThreads = h.growThreads(s, p, moneyMax)
-		const excessDifficulty = s.hackDifficulty! - s.minDifficulty!
-		const growthDifficulty = SEC_PER_GROW * growThreads
-		const excessWeakThreads = Math.ceil(excessDifficulty / SEC_PER_WEAK)
-		const growthWeakThreads = Math.ceil(growthDifficulty / SEC_PER_WEAK)
-
-		return {
-			target: this
-		}
+		const excessDifficulty = s.hackDifficulty - s.minDifficulty
+		const difficultyRange = 100 - s.minDifficulty
+		return 1 - excessDifficulty / difficultyRange
 	}
 }

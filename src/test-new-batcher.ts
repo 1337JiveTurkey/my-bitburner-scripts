@@ -35,7 +35,10 @@ export async function main(ns: NS) {
 
 		log.info("Gathered $%s", ns.formatNumber(ns.self().onlineMoneyMade))
 		if (calculator.needsPrep()) {
-			log.warn("Server needs prep after test run")
+			log.warn("Server needs prep after test run. Money: %s, Security: %s",
+				ns.formatPercent(calculator.moneyPrep()),
+				ns.formatPercent(calculator.securityPrep()),
+			)
 			const {result} = await hacking.prepareServer({hostname})
 			log.info("%s", result)
 		}
