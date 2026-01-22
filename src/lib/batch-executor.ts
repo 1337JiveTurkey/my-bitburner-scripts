@@ -20,7 +20,7 @@ export default class BatchExecutor {
 			this.#log = new Log(ns)
 		}
 		this.#pool = new WorkerPool(ns)
-		this.#log.info("Created BatchExecutor with " + this.#pool.workers.length + " workers.")
+		this.#log.fine("Created BatchExecutor with " + this.#pool.workers.length + " workers.")
 	}
 
 	/**
@@ -52,7 +52,7 @@ export default class BatchExecutor {
 	async runOnWorkers(batch: BatchStats) {
 		const target = batch.target
 		const hostname = target.hostname
-		this.#log.info("Targeting " + hostname)
+		this.#log.fine("Targeting %s with %s", hostname, this.#ns.formatPercent(batch.hackPercent))
 
 		const batchTask = new CompoundTask(
 			new HackTask(hostname, batch.hackThreads, target.hackDelay),
