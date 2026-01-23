@@ -16,7 +16,7 @@ export async function main(ns: NS) {
 
 	while (true) {
 		const calculator = new BatchCalculator(ns, hostname, log)
-		calculator.padding = .1
+		calculator.padding = .20
 		const executor = new BatchExecutor(ns, log)
 
 		if (calculator.needsPrep()) {
@@ -26,6 +26,7 @@ export async function main(ns: NS) {
 			)
 			const {result} = await hacking.prepareServer({hostname})
 			log.info("%s", result)
+			calculator.recalculateTimes()
 		}
 
 		const possibleBatches: BatchStats[] = calculator.calculateEstimates()
