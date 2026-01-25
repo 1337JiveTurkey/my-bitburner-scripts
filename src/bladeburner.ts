@@ -65,6 +65,9 @@ function selectAction(ns: NS): BladeburnerAction {
 	const blackOp = BladeburnerAction.nextBlackOp(ns)
 	if (blackOp) {
 		const [low, high] = blackOp.chances
+		if (low !== high) {
+			return BladeburnerAction.analysis(ns)
+		}
 		const sufficientRank = blackOp.rankRequirementMet
 		if (low === 1 && sufficientRank) {
 			return blackOp
@@ -98,7 +101,6 @@ function selectAction(ns: NS): BladeburnerAction {
 
 function selectSkills(ns: NS): BladeburnerSkillName[] {
 	const assassination = BladeburnerAction.assassination(ns)
-	let current = BladeburnerAction.current(ns)?? assassination
 
 	let skillPriority: BladeburnerSkillName[]
 	const [low, high] = assassination.chances
@@ -113,7 +115,18 @@ function selectSkills(ns: NS): BladeburnerSkillName[] {
 			skillPriority = STAT_BOOSTERS
 		}
 	} else {
-		skillPriority = HYPERDRIVE
+		// If there's a blackop, make sure we can complete it
+		const blackOp = BladeburnerAction.nextBlackOp(ns)
+		if (blackOp) {
+			const [low, high] = blackOp.chances
+			if (low < 1) {
+				skillPriority = CHANCE_BOOSTERS
+			} else {
+				skillPriority = HYPERDRIVE
+			}
+		} else {
+			skillPriority = HYPERDRIVE
+		}
 	}
 	return skillPriority
 }
