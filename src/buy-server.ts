@@ -31,19 +31,30 @@ export async function main(ns: NS) {
 
 function listServerCosts(ns: NS) {
 	const serverCount = ns.getPurchasedServerLimit()
+	const servers = getServerSizes(ns, true)
 
-	const ramTable = new Table()
+	const ramTable = new Table({defaultWidth:20})
 	ramTable.addColumn({headerText:"RAM Amount",fieldType:"ram"})
 	ramTable.addColumn({headerText:"Server Cost",fieldType:"number"})
 	ramTable.addColumn({headerText:serverCount + "x Cost",fieldType:"number"})
 	ramTable.addColumn({headerText:serverCount + "x Upgrade",fieldType:"number"})
+	ramTable.addColumn({headerText:"Upgrade Existing",fieldType:"number"})
 	let size = 1
 	let prevTotal = 0
 	do {
 		size *= 2
 		const cost = ns.getPurchasedServerCost(size)
 		const total = cost * serverCount
-		ramTable.addRow([size, cost, total, total - prevTotal])
+
+		// Calculate cost to upgrade all existing servers to this size
+		let upgradeCost = 0
+		for (const {hostname, maxRam} of servers) {
+			if (maxRam < size) {
+				upgradeCost += ns.getPurchasedServerUpgradeCost(hostname, size)
+			}
+		}
+
+		ramTable.addRow([size, cost, total, total - prevTotal, upgradeCost])
 		prevTotal = serverCount * cost
 	} while (size < ns.getPurchasedServerMaxRam())
 
