@@ -1,4 +1,5 @@
 import {NS} from "@ns"
+import Table from "lib/tables";
 
 export async function main(ns: NS) {
 	const flags = ns.flags([
@@ -14,14 +15,14 @@ export async function main(ns: NS) {
 	const budgetFlag = Number(flags["budget"])
 	const budget = budgetFlag >= 0? budgetFlag : ns.getPlayer().money
 
-	const wide = flags["wide"]
-	const tall = flags["tall"]
 	let changes = false
-	if (!tall) {
+	if (flags["wide"]) {
 		changes = changes || wideStrategy(ns, budget)
 	}
-	if (tall) {
+	else if (flags["tall"]) {
 		changes = changes || tallStrategy(ns, budget)
+	} else {
+		ns.tprintf("Expecting either --list, --wide or --tall")
 	}
 	if (changes) {
 		ns.spawn("service.js", { spawnDelay: 100 }, "server-state.js")
@@ -29,13 +30,24 @@ export async function main(ns: NS) {
 }
 
 function listServerCosts(ns: NS) {
+	const serverCount = ns.getPurchasedServerLimit()
+
+	const ramTable = new Table()
+	ramTable.addColumn({headerText:"RAM Amount",fieldType:"ram"})
+	ramTable.addColumn({headerText:"Server Cost",fieldType:"number"})
+	ramTable.addColumn({headerText:serverCount + "x Cost",fieldType:"number"})
+	ramTable.addColumn({headerText:serverCount + "x Upgrade",fieldType:"number"})
 	let size = 1
+	let prevTotal = 0
 	do {
 		size *= 2
-		const cost = ns.formatNumber(ns.getPurchasedServerCost(size))
-		const ram = ns.formatRam(size)
-		ns.tprintf("%15s%15s", ram, cost)
+		const cost = ns.getPurchasedServerCost(size)
+		const total = cost * serverCount
+		ramTable.addRow([size, cost, total, total - prevTotal])
+		prevTotal = serverCount * cost
 	} while (size < ns.getPurchasedServerMaxRam())
+
+	ramTable.printToTerminal(ns)
 }
 
 /**
