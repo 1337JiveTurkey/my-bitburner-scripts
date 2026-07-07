@@ -46,9 +46,13 @@ export default class BatchCalculator implements TargetStats {
 			this.#useFormulas = useFormulas
 		}
 
-		this.hackRam = ns.getScriptRam("doHack.js")
-		this.growRam = ns.getScriptRam("doGrow.js")
-		this.weakRam = ns.getScriptRam("doWeak.js")
+		// Measure the RAM of the workers this system actually runs (see the
+		// *_WORKER constants in lib/worker.ts, which BatchExecutor executes).
+		// The old doHack/doGrow/doWeak scripts belong to the cluster/hgw-batcher
+		// path and aren't run here, so measuring them gave 0 RAM.
+		this.hackRam = ns.getScriptRam("workers/hack.js")
+		this.growRam = ns.getScriptRam("workers/grow.js")
+		this.weakRam = ns.getScriptRam("workers/weaken.js")
 		this.hostname = target
 
 		this.recalculateTimes()
