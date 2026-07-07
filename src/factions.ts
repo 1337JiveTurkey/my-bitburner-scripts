@@ -1,4 +1,4 @@
-import { NS, Multipliers } from "@ns"
+import { NS, Multipliers, FactionName } from "@ns"
 import { getAugFlags } from "/lib/augmentation";
 
 const workTypes = ["field", "hacking", "security"]
@@ -14,7 +14,7 @@ export async function main(ns: NS) {
 	}
 }
 
-function analyzeFaction(ns: NS, factionName: string) {
+function analyzeFaction(ns: NS, factionName: FactionName) {
 	const s = ns.singularity
 	const w = ns.formulas.work
 	const player = ns.getPlayer()

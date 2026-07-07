@@ -89,7 +89,7 @@ function doTerritoryWarfare(ns: NS) {
 	const gangName = gangInfo.faction
 	const ourGangPower = gangInfo.power
 	let opposingGangPower = 0
-	const otherGangs = ns.gang.getOtherGangInformation()
+	const otherGangs = ns.gang.getAllGangInformation()
 	for (const [name, info] of Object.entries(otherGangs)) {
 		if (name !== gangName && info.territory > 0) {
 			opposingGangPower += info.power

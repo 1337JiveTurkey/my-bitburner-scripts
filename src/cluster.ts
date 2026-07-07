@@ -256,7 +256,7 @@ export class PurchasedCluster extends ComputeCluster {
 		super(ns)
 
 		const prefix = "cluster-"
-		for (let i = 0; i < ns.getPurchasedServerLimit(); i++) {
+		for (let i = 0; i < ns.cloud.getServerLimit(); i++) {
 			const serverName = prefix + i
 			this.#clusterNames.push(serverName)
 			if (ns.serverExists(serverName)) {
@@ -272,7 +272,7 @@ export class PurchasedCluster extends ComputeCluster {
 			const perServerBudget = budget / toBuy
 			let size = 1
 			for (let i = 0; i < 20; i++) {
-				if (this.ns.getPurchasedServerCost(size * 2) > perServerBudget) {
+				if (this.ns.cloud.getServerCost(size * 2) > perServerBudget) {
 					break
 				}
 				size *= 2
@@ -280,9 +280,9 @@ export class PurchasedCluster extends ComputeCluster {
 			if (size > 1) {
 				for (let i = this.servers.length; i < this.#clusterNames.length; i++) {
 					const serverName = this.#clusterNames[i];
-					const purchasedName = this.ns.purchaseServer(serverName, size)
+					const purchasedName = this.ns.cloud.purchaseServer(serverName, size)
 					this.addServer(purchasedName)
-					this.ns.print("Purchased " + serverName + " with " + this.ns.formatRam(size))
+					this.ns.print("Purchased " + serverName + " with " + this.ns.format.ram(size))
 				}
 			}
 		} else {
@@ -299,14 +299,14 @@ export class PurchasedCluster extends ComputeCluster {
 			}
 			if (min < MAX_RAM && minServer != null) {
 				this.clearCachedData()
-				const upgradeCost = this.ns.getPurchasedServerUpgradeCost(minServer, min * 2)
+				const upgradeCost = this.ns.cloud.getServerUpgradeCost(minServer, min * 2)
 				let upgradeAmount = Math.floor(budget / upgradeCost)
 				for (let i = 0; i < this.servers.length; i++) {
 					const server = this.#clusterNames[i]
 					const ram = this.ns.getServerMaxRam(server)
 					if (ram == min && upgradeAmount > 0) {
-						this.ns.upgradePurchasedServer(server, 2 * min)
-						this.ns.print("Upgraded " + server + " to " + this.ns.formatRam(2 * min))
+						this.ns.cloud.upgradeServer(server, 2 * min)
+						this.ns.print("Upgraded " + server + " to " + this.ns.format.ram(2 * min))
 						upgradeAmount--
 					}
 				}

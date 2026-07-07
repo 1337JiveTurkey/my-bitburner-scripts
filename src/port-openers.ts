@@ -1,6 +1,6 @@
-import { NS } from "@ns"
+import { NS, ProgramName } from "@ns"
 
-const PORT_OPENERS = [
+const PORT_OPENERS: ProgramName[] = [
 	"BruteSSH.exe",
 	"FTPCrack.exe",
 	"relaySMTP.exe",

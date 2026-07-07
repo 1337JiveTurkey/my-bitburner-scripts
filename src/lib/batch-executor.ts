@@ -1,6 +1,6 @@
 import { NS } from "@ns"
 import Log from "lib/logging"
-import { TargetStats, BatchStats } from "lib/batch-stats"
+import { BatchStats } from "lib/batch-stats"
 import { WorkerPool, CompoundTask, HackTask, GrowTask, WeakenTask } from "lib/worker"
 
 /**
@@ -52,7 +52,7 @@ export default class BatchExecutor {
 	async runOnWorkers(batch: BatchStats) {
 		const target = batch.target
 		const hostname = target.hostname
-		this.#log.fine("Targeting %s with %s", hostname, this.#ns.formatPercent(batch.hackPercent))
+		this.#log.fine("Targeting %s with %s", hostname, this.#ns.format.percent(batch.hackPercent))
 
 		const batchTask = new CompoundTask(
 			new HackTask(hostname, batch.hackThreads, target.hackDelay),

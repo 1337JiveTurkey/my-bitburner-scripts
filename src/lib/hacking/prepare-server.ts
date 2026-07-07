@@ -39,8 +39,8 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool): Promise<str
 		const growTime = ns.getGrowTime(target)
 		const weakTime = ns.getWeakenTime(target)
 		ns.tprintf("Grow Time: %s Weak Time: %s",
-			ns.tFormat(growTime, false),
-			ns.tFormat(weakTime, false))
+			ns.format.time(growTime, false),
+			ns.format.time(weakTime, false))
 
 		const growDelay = weakTime - growTime
 

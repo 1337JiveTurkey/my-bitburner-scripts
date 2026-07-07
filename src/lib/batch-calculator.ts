@@ -108,7 +108,7 @@ export default class BatchCalculator implements TargetStats {
 	 * Now computes the actual percentage of the server targeted.
 	 */
 	forPercentage(percent: number): BatchStats {
-		this.#log.fine("Calculating batch taking %s", this.#ns.formatPercent(percent))
+		this.#log.fine("Calculating batch taking %s", this.#ns.format.percent(percent))
 		if (this.#useFormulas) {
 			return this.#forPercentageFormula(percent)
 		} else {

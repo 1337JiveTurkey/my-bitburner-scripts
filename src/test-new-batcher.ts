@@ -21,8 +21,8 @@ export async function main(ns: NS) {
 
 		if (calculator.needsPrep()) {
 			log.warn("Server needs prep. Money: %s, Security: %s",
-				ns.formatPercent(calculator.moneyPrep()),
-				ns.formatPercent(calculator.securityPrep()),
+				ns.format.percent(calculator.moneyPrep()),
+				ns.format.percent(calculator.securityPrep()),
 			)
 			const {result} = await hacking.prepareServer({hostname})
 			log.info("%s", result)
@@ -43,7 +43,7 @@ export async function main(ns: NS) {
 			const oldMoney = ns.self().onlineMoneyMade
 			await executor.runOnWorkers(bestBatch)
 			const newMoney = ns.self().onlineMoneyMade
-			log.info("$%s earned", ns.formatNumber(newMoney - oldMoney))
+			log.info("$%s earned", ns.format.number(newMoney - oldMoney))
 		} else {
 			log.warn("%s", "No best batch found")
 			break

@@ -1,4 +1,4 @@
-import { NS } from "@ns"
+import { NS, FactionName } from "@ns"
 import AbstractGoal from "/goals/abstract-goal";
 
 export async function main(ns: NS) {
@@ -6,9 +6,9 @@ export async function main(ns: NS) {
 }
 
 class JoinFaction extends AbstractGoal {
-	readonly faction: string
+	readonly faction: FactionName
 
-	constructor(ns: NS, faction: string) {
+	constructor(ns: NS, faction: FactionName) {
 		super(ns);
 		this.faction = faction;
 	}

@@ -1,4 +1,4 @@
-import { NS } from "@ns"
+import { NS, HacknetServerHashUpgrade } from "@ns"
 import { getBudgetState } from "srv/budget-state"
 
 
@@ -167,7 +167,7 @@ function hackServer(ns: NS, serverName: string) {
 	}
 }
 
-function buyHacknetUpgrade(ns: NS, upgradeName: string, target: number): number {
+function buyHacknetUpgrade(ns: NS, upgradeName: HacknetServerHashUpgrade, target: number): number {
 	const hn = ns.hacknet
 	const currentLevel = hn.getHashUpgradeLevel(upgradeName)
 	if (currentLevel >= target) {
@@ -201,7 +201,7 @@ const upgrades = {
 	bbSp: "Exchange for Bladeburner SP",
 	contract: "Generate Coding Contract",
 	favor: "Company Favor",
-}
+} as const
 
 /**
  * Returns the hacknet state of the system as last calculated.

@@ -31,7 +31,7 @@ function manageGang(ns: NS): GangState {
 	let opposingGangPower = 0
 	let territory = myGangInfo.territory
 
-	const otherGangs = ns.gang.getOtherGangInformation()
+	const otherGangs = ns.gang.getAllGangInformation()
 	for (const [name, info] of Object.entries(otherGangs)) {
 		if (name !== faction && info.territory > 0) {
 			opposingGangPower += info.power

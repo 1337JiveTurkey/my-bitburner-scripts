@@ -1,8 +1,8 @@
-import {NS, Server} from "@ns"
+import {NS, Server, ProgramName} from "@ns"
 import dodgedMain from "lib/dodge-script"
 import {OpenPortsParams, OpenPortsResults} from "lib/servers/interface"
 
-const PORT_OPENERS = [
+const PORT_OPENERS: ProgramName[] = [
 	"BruteSSH.exe",
 	"FTPCrack.exe",
 	"relaySMTP.exe",

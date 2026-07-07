@@ -6,7 +6,7 @@ export async function main(ns: NS) {
 		ns.tprintf("No corporation to operate!")
 	}
 	
-	ns.tprintf("Cost for offices: $%s", ns.formatNumber(expandOfficeCost(ns, "TobacCorp", 120)))
+	ns.tprintf("Cost for offices: $%s", ns.format.number(expandOfficeCost(ns, "TobacCorp", 120)))
 //	expandOffice(ns, "TobacCorp", 120)
 
 //	fillOffices(ns, "TobacCorp")
@@ -39,7 +39,7 @@ function getAgDivisions(ns: NS): Division[] {
 	const corp = nsc.getCorporation()
 	for (const divName of corp.divisions) {
 		const div = nsc.getDivision(divName)
-		if (div.type === "Agriculture") {
+		if (div.industry === "Agriculture") {
 			foundDivisions.push(div)
 		}
 	}

@@ -113,19 +113,19 @@ export default class Table {
 						parameters.push(fieldValue)
 						break
 					case "number":
-						parameters.push(ns.formatNumber(fieldValue))
+						parameters.push(ns.format.number(fieldValue))
 						break
 					case "percent":
-						parameters.push(ns.formatPercent(fieldValue))
+						parameters.push(ns.format.percent(fieldValue))
 						break
 					case "msectime":
-						parameters.push(ns.tFormat(fieldValue, true))
+						parameters.push(ns.format.time(fieldValue, true))
 						break
 					case "sectime":
-						parameters.push(ns.tFormat(fieldValue, true))
+						parameters.push(ns.format.time(fieldValue, true))
 						break
 					case "ram":
-						parameters.push(ns.formatRam(fieldValue))
+						parameters.push(ns.format.ram(fieldValue))
 						break
 					default:
 						// TODO Add better error handling here for invalid field type

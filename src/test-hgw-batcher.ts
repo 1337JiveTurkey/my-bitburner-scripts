@@ -25,6 +25,6 @@ export async function main(ns: NS) {
 
 	const script = ns.getRunningScript()
 	// This script had better exist
-	log.info("Gathered $%s", ns.formatNumber(script!.onlineMoneyMade))
+	log.info("Gathered $%s", ns.format.number(script!.onlineMoneyMade))
 
 }

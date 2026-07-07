@@ -30,7 +30,7 @@ export async function main(ns: NS) {
 }
 
 function listServerCosts(ns: NS) {
-	const serverCount = ns.getPurchasedServerLimit()
+	const serverCount = ns.cloud.getServerLimit()
 	const servers = getServerSizes(ns, true)
 
 	const ramTable = new Table({defaultWidth:20})
@@ -43,20 +43,20 @@ function listServerCosts(ns: NS) {
 	let prevTotal = 0
 	do {
 		size *= 2
-		const cost = ns.getPurchasedServerCost(size)
+		const cost = ns.cloud.getServerCost(size)
 		const total = cost * serverCount
 
 		// Calculate cost to upgrade all existing servers to this size
 		let upgradeCost = 0
 		for (const {hostname, maxRam} of servers) {
 			if (maxRam < size) {
-				upgradeCost += ns.getPurchasedServerUpgradeCost(hostname, size)
+				upgradeCost += ns.cloud.getServerUpgradeCost(hostname, size)
 			}
 		}
 
 		ramTable.addRow([size, cost, total, total - prevTotal, upgradeCost])
 		prevTotal = serverCount * cost
-	} while (size < ns.getPurchasedServerMaxRam())
+	} while (size < ns.cloud.getRamLimit())
 
 	ramTable.printToTerminal(ns)
 }
@@ -67,15 +67,15 @@ function listServerCosts(ns: NS) {
  */
 function tallStrategy(ns: NS, budget: number): boolean {
 	const servers = getServerSizes(ns)
-	const maxServers = ns.getPurchasedServerLimit()
+	const maxServers = ns.cloud.getServerLimit()
 	let serverCount = servers.length
 	let remainingBudget = budget
 
 	for (const {hostname, maxRam} of servers) {
 		const {size, cost} = biggestUpgradeForBudget(ns, hostname, remainingBudget)
-		if (size > maxRam && ns.upgradePurchasedServer(hostname, size)) {
+		if (size > maxRam && ns.cloud.upgradeServer(hostname, size)) {
 			remainingBudget -= cost
-			ns.tprintf("Purchased %s upgrade to %s", ns.formatRam(size), hostname)
+			ns.tprintf("Purchased %s upgrade to %s", ns.format.ram(size), hostname)
 		}
 	}
 	while (serverCount < maxServers) {
@@ -96,7 +96,7 @@ function tallStrategy(ns: NS, budget: number): boolean {
  */
 function wideStrategy(ns: NS, budget: number): boolean {
 	const servers = getServerSizes(ns)
-	const maxServers = ns.getPurchasedServerLimit()
+	const maxServers = ns.cloud.getServerLimit()
 	let serverCount = servers.length
 	const perServerBudget = budget / maxServers
 	let remainingBudget = budget
@@ -112,8 +112,8 @@ function wideStrategy(ns: NS, budget: number): boolean {
 	}
 	for (const {hostname, maxRam} of servers) {
 		const {size, cost} = biggestUpgradeForBudget(ns, hostname, perServerBudget)
-		if (size > maxRam && ns.upgradePurchasedServer(hostname, size)) {
-			ns.tprintf("Purchased %s upgrade to %s", ns.formatRam(size), hostname)
+		if (size > maxRam && ns.cloud.upgradeServer(hostname, size)) {
+			ns.tprintf("Purchased %s upgrade to %s", ns.format.ram(size), hostname)
 			remainingBudget -= cost
 		}
 	}
@@ -121,7 +121,7 @@ function wideStrategy(ns: NS, budget: number): boolean {
 }
 
 function getServerSizes(ns: NS, ascending = false) {
-	const hostnames = ns.getPurchasedServers()
+	const hostnames = ns.cloud.getServerNames()
 	const servers = hostnames.map(hostname => ({
 		hostname: hostname,
 		maxRam: ns.getServerMaxRam(hostname)
@@ -135,9 +135,9 @@ function getServerSizes(ns: NS, ascending = false) {
 }
 
 function biggestPurchaseForBudget(ns: NS, budget: number) {
-	let size = ns.getPurchasedServerMaxRam()
+	let size = ns.cloud.getRamLimit()
 	do {
-		const cost = ns.getPurchasedServerCost(size)
+		const cost = ns.cloud.getServerCost(size)
 		if (cost < budget) {
 			return {
 				size: size,
@@ -154,9 +154,9 @@ function biggestPurchaseForBudget(ns: NS, budget: number) {
 
 function biggestUpgradeForBudget(ns: NS, hostname: string, budget: number) {
 	const baseSize = ns.getServerMaxRam(hostname)
-	let size = ns.getPurchasedServerMaxRam()
+	let size = ns.cloud.getRamLimit()
 	while (baseSize < size) {
-		const cost = ns.getPurchasedServerUpgradeCost(hostname, size)
+		const cost = ns.cloud.getServerUpgradeCost(hostname, size)
 		if (cost < budget) {
 			return {
 				size: size,
@@ -173,10 +173,10 @@ function biggestUpgradeForBudget(ns: NS, hostname: string, budget: number) {
 
 function purchaseNextServer(ns: NS, size: number) {
 	const prefix = "cluster-"
-	for (let i = 0; i < ns.getPurchasedServerLimit(); i++) {
+	for (let i = 0; i < ns.cloud.getServerLimit(); i++) {
 		const serverName = prefix + i
 		if (!ns.serverExists(serverName)) {
-			let purchasedName = ns.purchaseServer(serverName, size)
+			let purchasedName = ns.cloud.purchaseServer(serverName, size)
 			if (purchasedName) {
 				ns.tprintf("Purchased %s", purchasedName)
 				return purchasedName

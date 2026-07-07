@@ -35,7 +35,7 @@ export async function main(ns: NS) {
 			s.travelToCity("New Tokyo")
 		}
 		if (aug.flags.includes("hacking")) {
-			ns.tprintf("%60s%45s%15s", aug.name, ns.tFormat(aug.time), ns.formatNumber(aug.price))
+			ns.tprintf("%60s%45s%15s", aug.name, ns.format.time(aug.time), ns.format.number(aug.price))
 			g.graftAugmentation(aug.name, false)
 			await g.waitForOngoingGrafting()
 		}

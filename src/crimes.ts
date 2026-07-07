@@ -33,7 +33,7 @@ function listCrimes(ns: NS): void {
 		const moneyPerSecond = crimeMoney * crimeChance * 1000 / crimeTime
 
 		ns.tprintf("%20s%15s%15s%25s%15.0d",
-			crimeName, ns.formatNumber(crimeMoney), ns.formatPercent(crimeChance), ns.tFormat(crimeTime), moneyPerSecond)
+			crimeName, ns.format.number(crimeMoney), ns.format.percent(crimeChance), ns.format.time(crimeTime), moneyPerSecond)
 	}
 	ns.tprintf("----------------------------------------------------------------------------------------------")
 	ns.tprintf("Karma:%15d", ns.heart.break())
