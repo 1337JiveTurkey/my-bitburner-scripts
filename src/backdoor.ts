@@ -1,6 +1,6 @@
 import {NS, ScriptArg} from "@ns"
-
-import { getServers} from "/lib/servers/interface";
+import Log from "/lib/logging";
+import { ServersInterface } from "/lib/servers/interface";
 
 const factionTargets = new Set(["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z"])
 const finalTargets = new Set(["w0r1d_d43m0n"])
@@ -15,7 +15,8 @@ export async function main(ns: NS) {
 
 	const hacking = ns.getPlayer().skills.hacking
 
-	const servers = await getServers(ns, {})
+	const log = new Log(ns).toTerminal().level("INFO")
+	const servers = await new ServersInterface(ns, log).getServers({})
 	for (const [hostname, server] of Object.entries(servers)) {
 		const isTarget  = targets.has(hostname)
 		const canHack   = server.requiredHackingSkill <= hacking
