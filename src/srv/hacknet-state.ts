@@ -92,10 +92,10 @@ function getUpgradePrice(ns: NS, nodeID: number, {level=10, ram=1, cores=1, cach
 	const hn = ns.hacknet
 
 	const node = hn.getNodeStats(nodeID)
-	const levelUpgradeRequired = node.level - level
-	const ramUpgradeRequired   = node.ram   - ram
-	const coreUpgradeRequired  = node.cores - cores
-	const cacheUpgradeRequired = node.cache? node.cache - cache : 0
+	const levelUpgradeRequired = level - node.level
+	const ramUpgradeRequired   = ram   - node.ram
+	const coreUpgradeRequired  = cores - node.cores
+	const cacheUpgradeRequired = node.cache? cache - node.cache : 0
 
 	let total = 0
 	if (levelUpgradeRequired > 0)
@@ -118,15 +118,15 @@ function doUpgrade(ns: NS, nodeID: number, {level=10, ram=1, cores=1, cache=1} =
 	const hn = ns.hacknet
 
 	const node = hn.getNodeStats(nodeID)
-	const levelUpgradeRequired = node.level - level
-	const ramUpgradeRequired   = node.ram   - ram
-	const coreUpgradeRequired  = node.cores - cores
-	const cacheUpgradeRequired = node.cache? node.cache - cache : 0
+	const levelUpgradeRequired = level - node.level
+	const ramUpgradeRequired   = ram   - node.ram
+	const coreUpgradeRequired  = cores - node.cores
+	const cacheUpgradeRequired = node.cache? cache - node.cache : 0
 
 	if (levelUpgradeRequired > 0)
 		hn.upgradeLevel(nodeID, levelUpgradeRequired)
 	if (ramUpgradeRequired > 0)
-		hn.upgradeLevel(nodeID, ramUpgradeRequired)
+		hn.upgradeRam(nodeID, ramUpgradeRequired)
 	if (coreUpgradeRequired > 0)
 		hn.upgradeCore(nodeID, coreUpgradeRequired)
 	if (cacheUpgradeRequired > 0)
@@ -139,13 +139,13 @@ function doUpgrade(ns: NS, nodeID: number, {level=10, ram=1, cores=1, cache=1} =
 function getSmallerUpgrade(ns: NS, nodeID: number, upgrade: HacknetUpgrade): HacknetUpgrade {
 	const retVal: HacknetUpgrade = {}
 	const node = ns.hacknet.getNodeStats(nodeID)
-	if (upgrade.level && node.level > upgrade.level)
+	if (upgrade.level && upgrade.level > node.level)
 		retVal.level = (upgrade.level + node.level) / 2
-	if (upgrade.ram && node.ram > upgrade.ram)
+	if (upgrade.ram && upgrade.ram > node.ram)
 		retVal.ram = (upgrade.ram + node.ram) / 2
-	if (upgrade.cores && node.cores > upgrade.cores)
+	if (upgrade.cores && upgrade.cores > node.cores)
 		retVal.cores = (upgrade.cores + node.cores) / 2
-	if (upgrade.cache && node.cache && node.cache > upgrade.cache)
+	if (upgrade.cache && node.cache && upgrade.cache > node.cache)
 		retVal.cache = (upgrade.cache + node.cache) / 2
 
 	return retVal
