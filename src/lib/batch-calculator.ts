@@ -201,7 +201,7 @@ export default class BatchCalculator implements TargetStats {
 				break
 			}
 			const growThreads = this.pad(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - hackMoney)))
-			const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_HACK)
+			const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
 			const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
 			if (batchRam > maxRam && maxRam > 0) {
@@ -275,7 +275,7 @@ export default class BatchCalculator implements TargetStats {
 	needsPrep(): boolean {
 		this.#log.fine("Determining whether prep is necessary")
 		const s = this.#ns.getServer(this.hostname)
-		return s.moneyAvailable !== s.moneyMax && s.hackDifficulty !== s.minDifficulty
+		return s.moneyAvailable !== s.moneyMax || s.hackDifficulty !== s.minDifficulty
 	}
 
 	moneyPrep(): number {

@@ -204,7 +204,7 @@ export default class HGWBatcher {
 				break
 			}
 			const growThreads = Math.ceil(this.#ns.growthAnalyze(this.#target, moneyMax / (moneyMax - hackMoney)))
-			const weakThreads = Math.ceil((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_HACK)
+			const weakThreads = Math.ceil((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
 			const batchRam = hackThreads * this.#hackRam + growThreads * this.#growRam + weakThreads * this.#weakRam
 
 			this.#threadEstimates.push({
