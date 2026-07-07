@@ -1,4 +1,5 @@
 import {NS} from "@ns"
+import Log from "lib/logging"
 import dodgedMain from "lib/dodge-script"
 import {PrepareServerParams, PrepareServerResults} from "/lib/hacking/interface";
 import {CompoundTask, GrowTask, WeakenTask, WorkerPool} from "/lib/worker";
@@ -7,16 +8,16 @@ const SEC_PER_HACK = 0.002
 const SEC_PER_GROW = 0.004
 const SEC_PER_WEAK = 0.05
 
-export const main: (ns: NS) => Promise<void> = dodgedMain<PrepareServerParams, PrepareServerResults>(async (ns: NS, p: PrepareServerParams): Promise<PrepareServerResults> => {
+export const main: (ns: NS) => Promise<void> = dodgedMain<PrepareServerParams, PrepareServerResults>(async (ns: NS, p: PrepareServerParams, log: Log): Promise<PrepareServerResults> => {
 	const hostname = p.hostname
 	const pool = new WorkerPool(ns)
-	const result = await prepServer(ns, hostname, pool)
+	const result = await prepServer(ns, hostname, pool, log)
 	return {
 		result
 	}
 })
 
-async function prepServer(ns: NS, target: string, pool: WorkerPool): Promise<string> {
+async function prepServer(ns: NS, target: string, pool: WorkerPool, log: Log): Promise<string> {
 	do {
 		const server = ns.getServer(target)
 		if (!server.moneyMax || !server.moneyAvailable) {
@@ -38,13 +39,13 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool): Promise<str
 
 		const growTime = ns.getGrowTime(target)
 		const weakTime = ns.getWeakenTime(target)
-		ns.tprintf("Grow Time: %s Weak Time: %s",
+		log.info("Grow Time: %s Weak Time: %s",
 			ns.format.time(growTime, false),
 			ns.format.time(weakTime, false))
 
 		const growDelay = weakTime - growTime
 
-		ns.print(target + " growth: " + growThreads + " weaken: " + (excessWeakThreads + growthWeakThreads))
+		log.fine("%s growth: %d weaken: %d", target, growThreads, excessWeakThreads + growthWeakThreads)
 
 		if (excessWeakThreads) {
 			await pool.executeScalingTask(new WeakenTask(target, 1, 0))

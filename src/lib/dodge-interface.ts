@@ -1,5 +1,6 @@
 import {NS} from "@ns"
 import Log from "/lib/logging";
+import receiveMessages from "lib/dodge-receive";
 
 /**
  * Dodging interface that allows for logging across the run.
@@ -17,23 +18,9 @@ export default class DodgeInterface {
 		const p = JSON.stringify(params)
 		const pid: number = this.ns.run(scriptName, {temporary: true}, p)
 		if (pid) {
-			return await this.messages(pid)
+			return await receiveMessages<R>(this.ns, pid, this.log)
 		} else {
 			throw new Error(`Couldn't start ${scriptName} process.`)
-		}
-	}
-
-	protected async messages<R>(pid: number): Promise<R> {
-		while (true) {
-			await this.ns.nextPortWrite(pid)
-			const message = this.ns.readPort(pid)
-			const tag = message.tag
-			if (tag === "success") {
-				return message.result as R
-			}
-			else if (tag === "log") {
-				this.log.logInternal(message.level, message.format, message.args)
-			}
 		}
 	}
 }
