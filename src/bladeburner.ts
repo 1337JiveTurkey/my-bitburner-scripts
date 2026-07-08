@@ -12,7 +12,10 @@ export async function main(ns: NS) {
 			ns.printf("Buying Skills!!!!!")
 		}
 
-		nextAction.start()
+		if (!nextAction.start()) {
+			ns.printf("Couldn't start %s, training instead", nextAction.actionName)
+			BladeburnerAction.training(ns).start()
+		}
 		await nextActionComplete(ns)
 	}
 }
@@ -90,8 +93,9 @@ function selectAction(ns: NS): BladeburnerAction {
 		if (low !== high) {
 			return BladeburnerAction.analysis(ns)
 		}
+		// Counts regrow fractionally; starting an action needs a whole one
 		const remaining = action.countRemaining
-		if (low === 1 && remaining > 0) {
+		if (low === 1 && remaining >= 1) {
 			return action
 		}
 	}
