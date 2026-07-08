@@ -13,8 +13,10 @@ export interface TargetStats {
 	growTime: number
 	weakTime: number
 
-	hackDelay: number
-	growDelay: number
+	/** Security deltas per thread, measured in-game so BitNode multipliers apply. */
+	secPerHack: number
+	secPerGrow: number
+	secPerWeak: number
 }
 
 export function targetTable(bs: BatchStats): Table {

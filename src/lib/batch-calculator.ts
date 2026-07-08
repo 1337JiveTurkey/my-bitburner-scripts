@@ -1,10 +1,6 @@
-import {NS, Server} from "@ns"
+import {NS} from "@ns"
 import Log from "lib/logging"
 import { TargetStats, BatchStats } from "lib/batch-stats"
-
-const SEC_PER_HACK = 0.002
-const SEC_PER_GROW = 0.004
-const SEC_PER_WEAK = 0.05
 
 /**
  * Updated class for computing batch statistics. Cleaned up the calculations
@@ -23,12 +19,13 @@ export default class BatchCalculator implements TargetStats {
 	growRam = 0
 	weakRam = 0
 
+	secPerHack = 0
+	secPerGrow = 0
+	secPerWeak = 0
+
 	hackTime = 0
 	growTime = 0
 	weakTime = 0
-
-	hackDelay = 0
-	growDelay = 0
 
 	constructor(ns: NS, target: string, log: Log|null=null, useFormulas:boolean|null=null) {
 		this.#ns = ns
@@ -53,6 +50,17 @@ export default class BatchCalculator implements TargetStats {
 		this.hackRam = ns.getScriptRam("workers/hack.js")
 		this.growRam = ns.getScriptRam("workers/grow.js")
 		this.weakRam = ns.getScriptRam("workers/weaken.js")
+		if (!this.hackRam || !this.growRam || !this.weakRam) {
+			throw new Error("Worker scripts are missing so batches can't be sized")
+		}
+
+		// Measured rather than hard-coded: BitNode multipliers scale these
+		// (ServerWeakenRate in particular), and sizing weakens from the vanilla
+		// 0.05 leaves every batch under-weakened in such BitNodes.
+		this.secPerHack = ns.hackAnalyzeSecurity(1)
+		this.secPerGrow = ns.growthAnalyzeSecurity(1)
+		this.secPerWeak = ns.weakenAnalyze(1)
+
 		this.hostname = target
 
 		this.recalculateTimes()
@@ -71,9 +79,6 @@ export default class BatchCalculator implements TargetStats {
 		} else {
 			this.#recalculateTimes()
 		}
-
-		this.hackDelay = this.weakTime - this.hackTime
-		this.growDelay = this.weakTime - this.growTime
 	}
 
 	#recalculateTimes() {
@@ -128,7 +133,7 @@ export default class BatchCalculator implements TargetStats {
 
 		const hackThreads = Math.floor(this.#ns.hackAnalyzeThreads(this.hostname, targetMoney))
 		const growThreads = this.pad(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - targetMoney)))
-		const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
+		const weakThreads = this.pad((this.secPerHack * hackThreads + this.secPerGrow * growThreads) / this.secPerWeak)
 
 		const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 		const hackMoney = perThreadMoney * hackThreads
@@ -159,10 +164,10 @@ export default class BatchCalculator implements TargetStats {
 		const perThreadMoney = h.hackPercent(s, p) * moneyMax
 		const hackMoney = perThreadMoney * hackThreads
 		s.moneyAvailable! -= hackMoney
-		s.hackDifficulty! += SEC_PER_HACK * hackThreads
+		s.hackDifficulty! += this.secPerHack * hackThreads
 		const growThreads = this.pad(h.growThreads(s, p, moneyMax))
-		s.hackDifficulty! += SEC_PER_GROW * growThreads
-		const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
+		s.hackDifficulty! += this.secPerGrow * growThreads
+		const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / this.secPerWeak)
 
 		const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
@@ -201,7 +206,7 @@ export default class BatchCalculator implements TargetStats {
 				break
 			}
 			const growThreads = this.pad(this.#ns.growthAnalyze(this.hostname, moneyMax / (moneyMax - hackMoney)))
-			const weakThreads = this.pad((SEC_PER_HACK * hackThreads + SEC_PER_GROW * growThreads) / SEC_PER_WEAK)
+			const weakThreads = this.pad((this.secPerHack * hackThreads + this.secPerGrow * growThreads) / this.secPerWeak)
 			const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
 			if (batchRam > maxRam && maxRam > 0) {
@@ -246,10 +251,10 @@ export default class BatchCalculator implements TargetStats {
 				break
 			}
 			s.moneyAvailable! -= hackMoney
-			s.hackDifficulty! += SEC_PER_HACK * hackThreads
+			s.hackDifficulty! += this.secPerHack * hackThreads
 			const growThreads = this.pad(h.growThreads(s, p, moneyMax))
-			s.hackDifficulty! += SEC_PER_GROW * growThreads
-			const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / SEC_PER_WEAK)
+			s.hackDifficulty! += this.secPerGrow * growThreads
+			const weakThreads = this.pad((s.hackDifficulty! - s.minDifficulty!) / this.secPerWeak)
 			const batchRam = hackThreads * this.hackRam + growThreads * this.growRam + weakThreads * this.weakRam
 
 			if (batchRam > maxRam && maxRam > 0) {
@@ -280,7 +285,7 @@ export default class BatchCalculator implements TargetStats {
 
 	moneyPrep(): number {
 		const s = this.#ns.getServer(this.hostname)
-		if (!s.moneyMax || !s.moneyAvailable) {
+		if (!s.moneyMax || s.moneyAvailable === undefined) {
 			return -1
 		}
 		const moneyDeficit = s.moneyMax - s.moneyAvailable

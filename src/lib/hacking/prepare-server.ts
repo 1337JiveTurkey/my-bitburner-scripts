@@ -4,9 +4,6 @@ import dodgedMain from "lib/dodge-script"
 import {PrepareServerParams, PrepareServerResults} from "/lib/hacking/interface";
 import {CompoundTask, GrowTask, WeakenTask, WorkerPool} from "/lib/worker";
 
-const SEC_PER_HACK = 0.002
-const SEC_PER_GROW = 0.004
-const SEC_PER_WEAK = 0.05
 
 export const main: (ns: NS) => Promise<void> = dodgedMain<PrepareServerParams, PrepareServerResults>(async (ns: NS, p: PrepareServerParams, log: Log): Promise<PrepareServerResults> => {
 	const hostname = p.hostname
@@ -18,24 +15,29 @@ export const main: (ns: NS) => Promise<void> = dodgedMain<PrepareServerParams, P
 })
 
 async function prepServer(ns: NS, target: string, pool: WorkerPool, log: Log): Promise<string> {
+	// Measured rather than hard-coded so BitNode multipliers apply
+	const secPerGrow = ns.growthAnalyzeSecurity(1)
+	const secPerWeak = ns.weakenAnalyze(1)
+	// Largest grow:weaken ratio where one weaken thread still covers the grows
+	const growsPerWeaken = Math.max(Math.floor(secPerWeak / secPerGrow), 1)
 	do {
 		const server = ns.getServer(target)
-		if (!server.moneyMax || !server.moneyAvailable) {
+		if (!server.moneyMax) {
 			return "Server has no money so can't be prepped"
 		}
-		if (!server.hackDifficulty || !server.minDifficulty) {
+		if (server.hackDifficulty === undefined || server.minDifficulty === undefined) {
 			return "Server has no hack difficulty so can't be prepped"
 		}
-		const ratio = server.moneyMax / server.moneyAvailable
-		const growThreads = Number.isFinite(ratio)?
-			Math.ceil(ns.growthAnalyze(target, ratio)) :
-			Math.floor(server.moneyMax)
+		// A fully drained server still grows (grow adds a flat $1/thread
+		// before multiplying), so clamp to $1 instead of refusing to prep.
+		const moneyAvailable = Math.max(server.moneyAvailable ?? 0, 1)
+		const growThreads = Math.ceil(ns.growthAnalyze(target, server.moneyMax / moneyAvailable))
 
 		const excessDifficulty = server.hackDifficulty - server.minDifficulty
-		const growthDifficulty = SEC_PER_GROW * growThreads
+		const growthDifficulty = secPerGrow * growThreads
 
-		const excessWeakThreads = Math.ceil(excessDifficulty / SEC_PER_WEAK)
-		const growthWeakThreads = Math.ceil(growthDifficulty / SEC_PER_WEAK)
+		const excessWeakThreads = Math.ceil(excessDifficulty / secPerWeak)
+		const growthWeakThreads = Math.ceil(growthDifficulty / secPerWeak)
 
 		const growTime = ns.getGrowTime(target)
 		const weakTime = ns.getWeakenTime(target)
@@ -43,17 +45,26 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool, log: Log): P
 			ns.format.time(growTime, false),
 			ns.format.time(weakTime, false))
 
-		const growDelay = weakTime - growTime
-
 		log.fine("%s growth: %d weaken: %d", target, growThreads, excessWeakThreads + growthWeakThreads)
 
+		let results: PromiseSettledResult<any>[]
 		if (excessWeakThreads) {
-			await pool.executeScalingTask(new WeakenTask(target, 1, 0))
+			const weakenTask = new WeakenTask(ns, target, 1, 0)
+			results = await pool.executeScalingTask(weakenTask, excessWeakThreads)
+			log.info("Weaken pass launched %d/%d threads and removed %s of %s excess",
+				weakenTask.threadsLaunched, excessWeakThreads,
+				ns.format.number(weakenTask.reduced), ns.format.number(excessDifficulty))
 		} else if (growThreads) {
-			await pool.executeScalingTask(new CompoundTask(new GrowTask(target, 12, growDelay),
-				new WeakenTask(target, 1, 0)))
+			const growUnits = Math.ceil(growThreads / growsPerWeaken)
+			const endTime = Date.now() + weakTime
+			results = await pool.executeScalingTask(new CompoundTask(new GrowTask(ns, target, growsPerWeaken, endTime),
+				new WeakenTask(ns, target, 1, endTime)), growUnits)
 		} else {
 			break
+		}
+		// The only settled promise is the pool's built-in sleep, so nothing ran
+		if (results.length <= 1) {
+			log.warn("No worker RAM free to prep %s, waiting", target)
 		}
 	} while (true)
 	return "Finished prepping " + target

@@ -7,7 +7,7 @@ const WEAKEN_WORKER = "workers/weaken.js"
 const SHARE_WORKER = "workers/share.js"
 const CHARGE_WORKER = "workers/charge.js"
 
-const MAX_SCRIPTS = 200000
+export const MAX_SCRIPTS = 200000
 
 /**
  * Worker that runs on a given host with various worker scripts. The methods
@@ -27,25 +27,31 @@ export class Worker {
 		this.maxRam = maxRam
 
 		if (hostname !== "home") {
-			ns.scp([HACK_WORKER, GROW_WORKER, WEAKEN_WORKER, SHARE_WORKER, CHARGE_WORKER], hostname)
+			try {
+				ns.scp([HACK_WORKER, GROW_WORKER, WEAKEN_WORKER, SHARE_WORKER, CHARGE_WORKER], hostname)
+			} catch {
+				// Host may be gone since the state file was written; ram stays 0 so it's never scheduled
+			}
 		}
 	}
 
 	/**
 	 * Calls the appropriate worker script with all the parameters provided
 	 * by the caller and the Worker object. Returns a promise that completes
-	 * when the script finishes.
+	 * when the script finishes. endTime is the absolute timestamp the script
+	 * should finish at (0 = as soon as possible); the worker script pads its
+	 * own run from its live duration to land on that deadline.
 	 */
 	async exec(tool: string,
 	           target: string,
 	           threads: number,
-	           delay: number,
+	           endTime: number,
 	           stockType: string): Promise<number> {
 		const pid: number = this.#ns.exec(tool,
 		                                  this.hostname,
 		                                  { threads: threads, temporary: true },
 		                                  target,
-		                                  delay,
+		                                  endTime,
 		                                  stockType === this.stock)
 		if (pid) {
 			return this.#ns.nextPortWrite(pid).then(() => this.#ns.readPort(pid))
@@ -54,16 +60,16 @@ export class Worker {
 		}
 	}
 
-	async hack(target: string, threads: number, delay: number): Promise<number> {
-		return this.exec(HACK_WORKER, target, threads, delay, "hack")
+	async hack(target: string, threads: number, endTime: number): Promise<number> {
+		return this.exec(HACK_WORKER, target, threads, endTime, "hack")
 	}
 
-	async grow(target: string, threads: number, delay: number): Promise<number> {
-		return this.exec(GROW_WORKER, target, threads, delay, "grow")
+	async grow(target: string, threads: number, endTime: number): Promise<number> {
+		return this.exec(GROW_WORKER, target, threads, endTime, "grow")
 	}
 
-	async weaken(target: string, threads: number, delay: number): Promise<number> {
-		return this.exec(WEAKEN_WORKER, target, threads, delay, "weaken")
+	async weaken(target: string, threads: number, endTime: number): Promise<number> {
+		return this.exec(WEAKEN_WORKER, target, threads, endTime, "weaken")
 	}
 
 	async share(threads: number): Promise<void> {
@@ -96,7 +102,12 @@ export class Worker {
 	}
 
 	get ram(): number {
-		return this.#ns.getServerMaxRam(this.hostname) - this.#ns.getServerUsedRam(this.hostname)
+		try {
+			return this.#ns.getServerMaxRam(this.hostname) - this.#ns.getServerUsedRam(this.hostname)
+		} catch {
+			// Host may be gone since the state file was written
+			return 0
+		}
 	}
 }
 
@@ -119,8 +130,10 @@ export class WorkerPool {
 
 	/**
 	 * Executes a task by creating as many copies of it as the pool can handle.
+	 * Individual script failures are reported in the settled results rather
+	 * than rejecting the whole batch.
 	 */
-	async executeBatchTask(task: WorkerTask): Promise<any> {
+	async executeBatchTask(task: WorkerTask): Promise<PromiseSettledResult<any>[]> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
 w:		for (const worker of this.workers) {
 			const multiplier = worker.numberOfInstances(task.ram)
@@ -131,28 +144,33 @@ w:		for (const worker of this.workers) {
 				}
 			}
 		}
-		return await Promise.all(promises)
+		return await Promise.allSettled(promises)
 	}
 
 	/**
-	 * Executes a task that scales its threads to use up all available
-	 * resources on the thread pool.
+	 * Executes a task that scales its threads to use up available resources
+	 * on the thread pool, up to maxScale copies of the task in total.
 	 */
-	async executeScalingTask(task: WorkerTask): Promise<any> {
+	async executeScalingTask(task: WorkerTask, maxScale: number = Infinity): Promise<PromiseSettledResult<any>[]> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
+		let remaining = maxScale
 		for (const worker of this.workers) {
-			const multiplier = worker.numberOfInstances(task.ram)
-			if (multiplier) {
+			const multiplier = Math.min(worker.numberOfInstances(task.ram), remaining)
+			if (multiplier > 0) {
 				task.execute(worker, promises, multiplier)
+				remaining -= multiplier
+			}
+			if (remaining <= 0) {
+				break
 			}
 		}
-		return await Promise.all(promises)
+		return await Promise.allSettled(promises)
 	}
 
 	/**
 	 * Executes a task with no special behavior.
 	 */
-	async executeTask(task: WorkerTask): Promise<any> {
+	async executeTask(task: WorkerTask): Promise<PromiseSettledResult<any>[]> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
 		for (const worker of this.workers) {
 			const multiplier = worker.numberOfInstances(task.ram)
@@ -160,7 +178,7 @@ w:		for (const worker of this.workers) {
 				task.execute(worker, promises, 1)
 			}
 		}
-		return await Promise.all(promises)
+		return await Promise.allSettled(promises)
 	}
 
 	numberOfInstances(executableRam: number): number {
@@ -226,17 +244,25 @@ export class CompoundTask implements WorkerTask {
 
 /**
  * A task that involves executing a specific script, like hack, grow or weaken.
+ * RAM is measured from the actual worker script so scheduling can never
+ * diverge from what exec() will really consume.
  */
 abstract class ExecutableTask implements WorkerTask {
-	abstract readonly baseRam: number
+	readonly baseRam: number
 	readonly target: string
 	readonly threads: number
-	readonly delay: number
+	readonly endTime: number
+	/** Total threads across every script this task has launched. */
+	threadsLaunched = 0
 
-	constructor(target: string, threads: number, delay: number) {
+	protected constructor(ns: NS, script: string, target: string, threads: number, endTime: number) {
+		this.baseRam = ns.getScriptRam(script)
+		if (!this.baseRam) {
+			throw new Error(script + " is missing on " + ns.self().server + " so its RAM can't be measured")
+		}
 		this.target = target
 		this.threads = threads
-		this.delay = delay
+		this.endTime = endTime
 	}
 
 	get ram(): number {
@@ -247,25 +273,68 @@ abstract class ExecutableTask implements WorkerTask {
 }
 
 export class HackTask extends ExecutableTask {
-	readonly baseRam: number = 1.70
+	/** Money stolen so far by every script this task has launched. */
+	proceeds = 0
+	/** Scripts that have finished. */
+	landings = 0
+	/** Scripts whose hack failed and stole nothing. */
+	failures = 0
+
+	constructor(ns: NS, target: string, threads: number, endTime: number) {
+		super(ns, HACK_WORKER, target, threads, endTime)
+	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
-		promises.push(worker.hack(this.target, this.threads * scaling, this.delay))
+		this.threadsLaunched += this.threads * scaling
+		promises.push(worker.hack(this.target, this.threads * scaling, this.endTime)
+			.then(money => {
+				this.proceeds += money
+				this.landings++
+				if (!money) {
+					this.failures++
+				}
+			}))
 	}
 }
 
 export class GrowTask extends ExecutableTask {
-	readonly baseRam: number = 1.75
+	/** Scripts that have finished. */
+	landings = 0
+	/** Scripts that landed on an already-full server and grew nothing. */
+	noops = 0
+
+	constructor(ns: NS, target: string, threads: number, endTime: number) {
+		super(ns, GROW_WORKER, target, threads, endTime)
+	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
-		promises.push(worker.grow(this.target, this.threads * scaling, this.delay))
+		this.threadsLaunched += this.threads * scaling
+		promises.push(worker.grow(this.target, this.threads * scaling, this.endTime)
+			.then(multiplier => {
+				this.landings++
+				if (multiplier < 1.0001) {
+					this.noops++
+				}
+			}))
 	}
 }
 
 export class WeakenTask extends ExecutableTask {
-	readonly baseRam: number = 1.75
+	/** Scripts that have finished. */
+	landings = 0
+	/** Security actually removed, which is 0 when landing on a floored server. */
+	reduced = 0
+
+	constructor(ns: NS, target: string, threads: number, endTime: number) {
+		super(ns, WEAKEN_WORKER, target, threads, endTime)
+	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
-		promises.push(worker.weaken(this.target, this.threads * scaling, this.delay))
+		this.threadsLaunched += this.threads * scaling
+		promises.push(worker.weaken(this.target, this.threads * scaling, this.endTime)
+			.then(removed => {
+				this.landings++
+				this.reduced += removed
+			}))
 	}
 }

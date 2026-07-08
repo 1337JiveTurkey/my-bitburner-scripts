@@ -10,7 +10,12 @@ export async function main(ns: NS) {
 	const flags = ns.flags([
 		["list", false]
 	])
-	const hostname = flags["_"].toString()
+	const positional = flags["_"] as string[]
+	if (positional.length !== 1 || !ns.serverExists(positional[0])) {
+		ns.tprintf("Usage: run %s [--list] <hostname>", ns.self().filename)
+		return
+	}
+	const hostname = positional[0]
 	const log = new Log(ns).toTerminal().level("INFO")
 	const hacking = new HackingInterface(ns, log)
 
@@ -40,10 +45,8 @@ export async function main(ns: NS) {
 		// Get best batch if any for the worker pool
 		const bestBatch = executor.bestBatch(possibleBatches)
 		if (bestBatch) {
-			const oldMoney = ns.self().onlineMoneyMade
-			await executor.runOnWorkers(bestBatch)
-			const newMoney = ns.self().onlineMoneyMade
-			log.info("$%s earned", ns.format.number(newMoney - oldMoney))
+			const earned = await executor.runOnWorkers(bestBatch)
+			log.info("$%s earned", ns.format.number(earned))
 		} else {
 			log.warn("%s", "No best batch found")
 			break

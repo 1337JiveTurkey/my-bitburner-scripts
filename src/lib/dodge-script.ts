@@ -18,12 +18,32 @@ export default function dodgedMain<P, R>(realMain: (ns: NS, params: P, log: Log)
 		if (ns.args.length !== 1) {
 			throw new Error("Wrong number of args given. Was this called manually?")
 		}
-		const params = JSON.parse(ns.args[0].toString()) as P
-		const log = new Log(ns).toPort(ns.pid).level("FINER")
-		const result = await realMain(ns, params, log)
-		ns.writePort(ns.pid, {
-			tag: "success",
-			result
+		// The caller blocks on this port, so every exit path must write to it —
+		// including being killed mid-await, which only atExit can observe.
+		let reported = false
+		ns.atExit(() => {
+			if (!reported) {
+				ns.writePort(ns.pid, {
+					tag: "error",
+					message: ns.self().filename + " exited without returning a result"
+				})
+			}
 		})
+		try {
+			const params = JSON.parse(ns.args[0].toString()) as P
+			const log = new Log(ns).toPort(ns.pid).level("FINER")
+			const result = await realMain(ns, params, log)
+			reported = true
+			ns.writePort(ns.pid, {
+				tag: "success",
+				result
+			})
+		} catch (err) {
+			reported = true
+			ns.writePort(ns.pid, {
+				tag: "error",
+				message: String(err)
+			})
+		}
 	}
 }
