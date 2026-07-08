@@ -25,15 +25,15 @@ function listCrimes(ns: NS): void {
 
 	const p = ns.getPlayer()
 
-	for (const [crime, crimeName] of Object.entries(ns.enums.CrimeType)) {
-		const crimeStats = s.getCrimeStats(crime as CrimeType)
+	for (const crime of Object.values(ns.enums.CrimeType)) {
+		const crimeStats = s.getCrimeStats(crime)
 		const crimeTime = crimeStats.time
-		const crimeMoney = w.crimeGains(p, crime as CrimeType).money
-		const crimeChance = w.crimeSuccessChance(p, crime as CrimeType)
+		const crimeMoney = w.crimeGains(p, crime).money
+		const crimeChance = w.crimeSuccessChance(p, crime)
 		const moneyPerSecond = crimeMoney * crimeChance * 1000 / crimeTime
 
 		ns.tprintf("%20s%15s%15s%25s%15.0d",
-			crimeName, ns.format.number(crimeMoney), ns.format.percent(crimeChance), ns.format.time(crimeTime), moneyPerSecond)
+			crime, ns.format.number(crimeMoney), ns.format.percent(crimeChance), ns.format.time(crimeTime), moneyPerSecond)
 	}
 	ns.tprintf("----------------------------------------------------------------------------------------------")
 	ns.tprintf("Karma:%15d", ns.heart.break())
@@ -45,16 +45,17 @@ function getCrimeStats(ns: NS): CurrentCrimeStats[] {
 
 	const p = ns.getPlayer()
 	const retVal: CurrentCrimeStats[] = []
-	for (const [crime, crimeName] of Object.entries(ns.enums.CrimeType)) {
-		const crimeStats = s.getCrimeStats(crime as CrimeType)
-		const crimeGains = w.crimeGains(p, crime as CrimeType)
+	// The CrimeType enum's values are both the API token and the display name
+	for (const crime of Object.values(ns.enums.CrimeType)) {
+		const crimeStats = s.getCrimeStats(crime)
+		const crimeGains = w.crimeGains(p, crime)
 		retVal.push({
-			crimeType: crime as CrimeType,
-			crimeName,
+			crimeType: crime,
+			crimeName: crime,
 			crimeTime: crimeStats.time,
 			crimeMoney: crimeGains.money,
 			crimeKarma: crimeStats.karma,
-			crimeChance: w.crimeSuccessChance(p, crime as CrimeType)
+			crimeChance: w.crimeSuccessChance(p, crime)
 		})
 	}
 	return retVal
