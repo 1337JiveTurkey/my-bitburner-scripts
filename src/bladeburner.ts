@@ -17,12 +17,12 @@ export async function main(ns: NS) {
 	}
 }
 
-const MONEY: BladeburnerSkillName[] = ["Hands of Midas"] as BladeburnerSkillName[]
-const HYPERDRIVE: BladeburnerSkillName[] = ["Hyperdrive"] as BladeburnerSkillName[]
-const OVERCLOCK: BladeburnerSkillName[] = ["Overclock"] as BladeburnerSkillName[]
-const STAT_BOOSTERS: BladeburnerSkillName[] = ["Reaper", "Evasive System"] as BladeburnerSkillName[]
+const MONEY: BladeburnerSkillName[] = ["Hands of Midas"]
+const HYPERDRIVE: BladeburnerSkillName[] = ["Hyperdrive"]
+const OVERCLOCK: BladeburnerSkillName[] = ["Overclock"]
+const STAT_BOOSTERS: BladeburnerSkillName[] = ["Reaper", "Evasive System"]
 const CHANCE_BOOSTERS: BladeburnerSkillName[] =
-	["Blade's Intuition", "Cloak", "Short-Circuit", "Digital Observer"] as BladeburnerSkillName[]
+	["Blade's Intuition", "Cloak", "Short-Circuit", "Digital Observer"]
 
 function buySkills(ns: NS, skills: BladeburnerSkillName[]): boolean {
 	const bb = ns.bladeburner

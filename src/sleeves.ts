@@ -1,4 +1,4 @@
-import {GymType, NS} from "@ns"
+import { NS } from "@ns"
 
 export async function main(ns: NS) {
 	const s = ns.sleeve
@@ -49,22 +49,9 @@ function gym(ns: NS, i: number) {
 	if (s.getSleeve(i).city != "Sector-12") {
 		s.travel(i, "Sector-12")
 	}
-	let stat = ""
-	switch (i % 4) {
-		case 0:
-			stat = "strength"
-			break
-		case 1:
-			stat = "defense"
-			break
-		case 2:
-			stat = "dexterity"
-			break
-		case 3:
-			stat = "agility"
-			break
-	}
-	s.setToGymWorkout(i, "Powerhouse Gym", stat as GymType)
+	// The enum values ("str", "def", ...) are what the API accepts, not the keys
+	const gymStats = Object.values(ns.enums.GymType)
+	s.setToGymWorkout(i, "Powerhouse Gym", gymStats[i % gymStats.length])
 }
 
 function install(ns: NS, i: number) {

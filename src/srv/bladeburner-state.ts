@@ -28,7 +28,7 @@ export async function main(ns: NS) {
 
 function generateCityData(ns: NS): BBCity[] {
 	const cities: BBCity[] = []
-	for (const city of Object.values(ns.enums.CityName) as CityName[]) {
+	for (const city of Object.values(ns.enums.CityName)) {
 		const population = ns.bladeburner.getCityEstimatedPopulation(city)
 		const communities = ns.bladeburner.getCityCommunities(city)
 		const chaos = ns.bladeburner.getCityChaos(city)

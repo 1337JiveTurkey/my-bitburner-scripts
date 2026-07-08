@@ -105,55 +105,55 @@ export default class BladeburnerAction {
 			return null
 		}
 		return new BladeburnerAction(ns,
-			"Black Operations" as BladeburnerActionType,
-			nextAction.name as BladeburnerActionName,)
+			"Black Operations",
+			nextAction.name)
 	}
 
 	static training(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"General" as BladeburnerActionType,
-			"Training" as BladeburnerActionName)
+			"General",
+			"Training")
 	}
 
 	static analysis(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"General" as BladeburnerActionType,
-			"Field Analysis" as BladeburnerActionName)
+			"General",
+			"Field Analysis")
 	}
 
 	static diplomacy(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"General" as BladeburnerActionType,
-			"Diplomacy" as BladeburnerActionName)
+			"General",
+			"Diplomacy")
 	}
 
 	static regeneration(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"General" as BladeburnerActionType,
-			"Hyperbolic Regeneration Chamber" as BladeburnerActionName)
+			"General",
+			"Hyperbolic Regeneration Chamber")
 	}
 
 	static tracking(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"Contracts" as BladeburnerActionType,
-			"Tracking" as BladeburnerActionName)
+			"Contracts",
+			"Tracking")
 	}
 
 	static investigation(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"Operations" as BladeburnerActionType,
-			"Investigation" as BladeburnerActionName)
+			"Operations",
+			"Investigation")
 	}
 
 	static undercoverOp(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"Operations" as BladeburnerActionType,
-			"Undercover Operation" as BladeburnerActionName)
+			"Operations",
+			"Undercover Operation")
 	}
 
 	static assassination(ns: NS): BladeburnerAction {
 		return new BladeburnerAction(ns,
-			"Operations" as BladeburnerActionType,
-			"Assassination" as BladeburnerActionName)
+			"Operations",
+			"Assassination")
 	}
 }
