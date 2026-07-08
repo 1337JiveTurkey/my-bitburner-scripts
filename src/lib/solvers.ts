@@ -47,26 +47,31 @@ export function spiralize(ns: NS, data: number[][]): number[] {
 }
 
 export function squareRoot(ns: NS, s: bigint): bigint {
+	if (s < 2n) {
+		return s
+	}
 	const str = s.toString()
 	// Get our initial estimate by literally chopping off the bottom half
-	let oldE = BigInt(str.substring(0, str.length / 2))
+	let oldE = BigInt(str.substring(0, Math.ceil(str.length / 2)))
 	// Heron's method
 	for (let i = 0; i < 100; i++) {
-		let newE = (oldE + s / oldE) / 2n
-		// if (newE - oldE < 1n && oldE - newE < 1n)
-		// 	break
+		const newE = (oldE + s / oldE) / 2n
+		if (newE === oldE) {
+			break
+		}
 		oldE = newE
 	}
-	// Now try the closest ones to deal with rounding
+	// Now try the closest ones to deal with rounding. Compare errors as
+	// bigints: Number() can't distinguish adjacent errors at ~100 digits.
+	const abs = (x: bigint) => (x < 0n ? -x : x)
 	const plusOne = oldE + 1n
 	const minusOne = oldE - 1n
-	const errorPlusOne = Math.abs(Number(plusOne * plusOne - s))
-	const errorMinusOne = Math.abs(Number(minusOne * minusOne - s))
-	const errorOldE = Math.abs(Number(oldE * oldE - s))
-	const minError = Math.min(errorMinusOne, errorPlusOne, errorOldE)
-	if (minError === errorOldE) {
+	const errorPlusOne = abs(plusOne * plusOne - s)
+	const errorMinusOne = abs(minusOne * minusOne - s)
+	const errorOldE = abs(oldE * oldE - s)
+	if (errorOldE <= errorPlusOne && errorOldE <= errorMinusOne) {
 		return oldE
-	} else if (minError === errorMinusOne) {
+	} else if (errorMinusOne <= errorPlusOne) {
 		return minusOne
 	} else {
 		return plusOne
