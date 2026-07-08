@@ -243,6 +243,14 @@ export class CompoundTask implements WorkerTask {
 }
 
 /**
+ * Monotonic stamp shared by every task, for observing the order scripts'
+ * promises actually resolve in. Resolution order is a proxy for landing
+ * order: it reflects when each worker's port write is processed, just after
+ * its effect lands.
+ */
+let landingCounter = 0
+
+/**
  * A task that involves executing a specific script, like hack, grow or weaken.
  * RAM is measured from the actual worker script so scheduling can never
  * diverge from what exec() will really consume.
@@ -254,6 +262,10 @@ abstract class ExecutableTask implements WorkerTask {
 	readonly endTime: number
 	/** Total threads across every script this task has launched. */
 	threadsLaunched = 0
+	/** Scripts launched so far, which is also the next instance's index. */
+	launches = 0
+	/** Resolution-order stamp per instance, recorded as each script lands. */
+	readonly landingOrder: number[] = []
 
 	protected constructor(ns: NS, script: string, target: string, threads: number, endTime: number) {
 		this.baseRam = ns.getScriptRam(script)
@@ -267,6 +279,10 @@ abstract class ExecutableTask implements WorkerTask {
 
 	get ram(): number {
 		return this.threads * this.baseRam
+	}
+
+	protected stamp(instance: number) {
+		this.landingOrder[instance] = ++landingCounter
 	}
 
 	abstract execute(worker: Worker, promises: Promise<any>[], scaling: number): void;
@@ -285,9 +301,11 @@ export class HackTask extends ExecutableTask {
 	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
+		const instance = this.launches++
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.hack(this.target, this.threads * scaling, this.endTime)
 			.then(money => {
+				this.stamp(instance)
 				this.proceeds += money
 				this.landings++
 				if (!money) {
@@ -308,9 +326,11 @@ export class GrowTask extends ExecutableTask {
 	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
+		const instance = this.launches++
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.grow(this.target, this.threads * scaling, this.endTime)
 			.then(multiplier => {
+				this.stamp(instance)
 				this.landings++
 				if (multiplier < 1.0001) {
 					this.noops++
@@ -330,9 +350,11 @@ export class WeakenTask extends ExecutableTask {
 	}
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
+		const instance = this.launches++
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.weaken(this.target, this.threads * scaling, this.endTime)
 			.then(removed => {
+				this.stamp(instance)
 				this.landings++
 				this.reduced += removed
 			}))

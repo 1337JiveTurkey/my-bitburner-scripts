@@ -35,7 +35,7 @@ Pure functions that never call `ns` methods (contract solvers, batch math) compi
 
 **Worker Pool (`lib/worker.ts`)**: Manages distributed task execution across servers. Worker class handles individual server resources, WorkerPool coordinates distribution.
 
-**Batch Processing (`lib/batch-calculator.ts`, `lib/batch-executor.ts`)**: HGW (Hack-Grow-Weaken) batch optimization with timing calculations, thread management, and RAM optimization.
+**Batch Processing (`lib/batch-calculator.ts`, `lib/batch-executor.ts`)**: HGW (Hack-Grow-Weaken) batch optimization with timing calculations, thread management, and RAM optimization. This is a deliberate **shotgun batcher**: every script in a wave self-times to one shared absolute deadline and lands simultaneously. Waves can reach tens of thousands of batches, so **never introduce per-batch landing offsets or staggered deadlines** — any per-batch spacing multiplies into minutes of dead tail and has already been tried and reverted. Disorder within a wave is absorbed by the calculator's `growPadding`/`weakenPadding` (set via test-new-batcher's `--grow-padding`/`--weaken-padding` flags), not by ordering guarantees.
 
 **State Services (`srv/`)**: Dependency-managed services tracking server, budget, target, bladeburner, gang, and hacknet state. Dependencies declared in `src/config/services.json`.
 

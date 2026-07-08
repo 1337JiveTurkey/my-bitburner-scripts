@@ -8,11 +8,15 @@ import {HackingInterface} from "/lib/hacking/interface";
 export async function main(ns: NS) {
 	ns.disableLog("ALL")
 	const flags = ns.flags([
-		["list", false]
+		["list", false],
+		["grow-padding", 0.10],
+		["weaken-padding", 0.10],
+		["prep-tolerance", 0.99],
 	])
 	const positional = flags["_"] as string[]
 	if (positional.length !== 1 || !ns.serverExists(positional[0])) {
-		ns.tprintf("Usage: run %s [--list] <hostname>", ns.self().filename)
+		ns.tprintf("Usage: run %s [--list] [--grow-padding 0.1] [--weaken-padding 0.1] [--prep-tolerance 0.99] <hostname>",
+			ns.self().filename)
 		return
 	}
 	const hostname = positional[0]
@@ -21,7 +25,9 @@ export async function main(ns: NS) {
 
 	while (true) {
 		const calculator = new BatchCalculator(ns, hostname, log)
-		calculator.padding = .20
+		calculator.growPadding = flags["grow-padding"] as number
+		calculator.weakenPadding = flags["weaken-padding"] as number
+		calculator.prepTolerance = flags["prep-tolerance"] as number
 		const executor = new BatchExecutor(ns, log)
 
 		if (calculator.needsPrep()) {
