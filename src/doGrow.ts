@@ -1,8 +1,7 @@
 import { NS } from "@ns"
 
-/** @param {NS} ns */
-export async function main(ns) {
-	const params = JSON.parse(ns.args[0])
+export async function main(ns: NS) {
+	const params = JSON.parse(ns.args[0] as string)
 
 	if ("delay" in params) {
 		await ns.grow(params.target, {additionalMsec: params.delay})

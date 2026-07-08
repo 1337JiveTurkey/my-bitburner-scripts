@@ -348,13 +348,24 @@ export class ComputeServer {
 			const freeRam = stats.maxRam - stats.ramUsed
 			const data = {
 				freeRam: freeRam,
-				hacksPossible: Math.floor(freeRam / this.#ns.getScriptRam("doHack.js")),
-				growsPossible: Math.floor(freeRam / this.#ns.getScriptRam("doGrow.js")),
-				weaksPossible: Math.floor(freeRam / this.#ns.getScriptRam("doWeak.js")),
+				hacksPossible: Math.floor(freeRam / this.#scriptRam("doHack.js")),
+				growsPossible: Math.floor(freeRam / this.#scriptRam("doGrow.js")),
+				weaksPossible: Math.floor(freeRam / this.#scriptRam("doWeak.js")),
 			}
 			this.#cachedData = data
 		}
 		return this.#cachedData[name]
+	}
+
+	// getScriptRam returns 0 when a script is missing or fails RAM calculation
+	// (e.g. a broken import); dividing by that sends Infinity threads to exec
+	#scriptRam(script: string) {
+		const ram = this.#ns.getScriptRam(script)
+		if (ram <= 0) {
+			throw new Error(script + " has no RAM cost on this host: " +
+				"it is missing or has a broken import")
+		}
+		return ram
 	}
 
 	get serverName() {
@@ -421,6 +432,8 @@ export class ComputeServer {
 			await this.#ns.nextPortWrite(replyPort)
 			return this.#ns.readPort(replyPort)
 		} else {
+			this.#ns.print("ERROR exec failed: " + params.script + " on " + params.server +
+				" with " + params.threads + " threads")
 			return "Failed"
 		}
 	}
