@@ -6,6 +6,9 @@ import { maxiumumSubarray, partitions, squareRoot, uniquePaths } from "lib/solve
 /**
  * Finds contracts on machines that haven't been solved yet and
  * runs solvers for the ones I've figured out so far.
+ *
+ * --list prints every contract found instead of solving them.
+ * --test creates dummy contracts on home to exercise a solver.
  */
 export async function main(ns: NS) {
 	const flags = ns.flags([
@@ -46,6 +49,13 @@ export async function main(ns: NS) {
 	}
 }
 
+/**
+ * Dispatch table keyed by the exact in-game contract name. Every solver
+ * takes ns as its first parameter, even when unused, so this map can call
+ * them uniformly. To support a new contract type, implement the logic in
+ * lib/solvers.ts (keeping it free of ns calls so it can be tested outside
+ * the game) and add an entry here.
+ */
 // @ts-ignore
 const solvers: {[name in CodingContractName]:  (ns: NS, data: any) => any } = {
 	"Algorithmic Stock Trader I": function(ns: NS, data: number[]): number {

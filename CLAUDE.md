@@ -14,7 +14,13 @@ npm run watch:transpile  # TypeScript compiler only
 npm run watch:remote     # Remote file sync only (bitburner-filesync)
 ```
 
+While `npm run watch` is running, edits under `src/` reach the running game within seconds — there is no separate deploy step. `dist/` is generated output; never edit it directly.
+
 No test or lint scripts are configured in package.json. ESLint config exists but has no custom rules.
+
+### Verifying Logic Locally
+
+Pure functions that never call `ns` methods (contract solvers, batch math) compile to plain ES modules in `dist/`. To test one outside the game, copy `dist/lib/<module>.js` to a `.mjs` file and drive it with `node`. Imports from `@ns` are type-only and erased at compile time, so no game runtime is needed. Keep testable logic free of `ns` calls where practical (see `lib/solvers.ts`).
 
 ## Architecture
 
@@ -49,6 +55,12 @@ import { someFn } from "lib/logging"  // Library imports
 - Strict mode enabled
 - Source root: `/src/`, output: `/dist/`
 - Path aliases: `@ns` → NetscriptDefinitions.d.ts, `@react` → lib/react.ts
+
+## Game Behavior
+
+**Never hard-code game constants.** BitNode multipliers scale core mechanics — in the current save, weaken removes ~0.0336 security per thread, not the base 0.05. Measure at runtime instead: `ns.weakenAnalyze(1)`, `ns.hackAnalyzeSecurity(threads)`, `ns.growthAnalyzeSecurity(threads)`.
+
+**Validate mechanics against the game source, not from memory.** The authoritative reference is https://github.com/bitburner-official/bitburner-src — e.g., coding contract generators and answer checkers live in `src/CodingContract/contracts/`. Contract inputs are often generated adversarially (deliberate edge cases), so check the generator before trusting a solver.
 
 ## Game Connection
 
