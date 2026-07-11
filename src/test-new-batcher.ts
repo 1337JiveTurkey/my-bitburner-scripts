@@ -14,13 +14,16 @@ export async function main(ns: NS) {
 		["prep-tolerance", 0.99],
 		["security-tolerance", 1.0],
 		["launch-slack", 2000],
-		["backlog-batches", 1.0],
+		["backlog-batches", 0.05],
 		["host-spacing", 100],
+		["chunk-size", 100],
+		["chunk-spacing", 5],
 	])
 	const positional = flags["_"] as string[]
 	if (positional.length !== 1 || !ns.serverExists(positional[0])) {
 		ns.tprintf("Usage: run %s [--list] [--grow-padding 0.1] [--weaken-padding 0.1] [--prep-tolerance 0.99] "
-			+ "[--security-tolerance 1.0] [--launch-slack 2000] [--backlog-batches 1.0] [--host-spacing 100] <hostname>",
+			+ "[--security-tolerance 1.0] [--launch-slack 2000] [--backlog-batches 0.05] [--host-spacing 100] "
+			+ "[--chunk-size 100] [--chunk-spacing 5] <hostname>",
 			ns.self().filename)
 		return
 	}
@@ -38,6 +41,8 @@ export async function main(ns: NS) {
 		executor.launchSlack = flags["launch-slack"] as number
 		executor.backlogBatches = flags["backlog-batches"] as number
 		executor.hostSpacing = flags["host-spacing"] as number
+		executor.chunkSize = flags["chunk-size"] as number
+		executor.chunkSpacing = flags["chunk-spacing"] as number
 
 		if (calculator.needsPrep()) {
 			log.warn("Server needs prep. Money: %s, Security: %s",

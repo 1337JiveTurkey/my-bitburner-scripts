@@ -14,10 +14,14 @@ export const MAX_SCRIPTS = 200000
  * result, plus the deadline margin the script saw when it started. A negative
  * margin means the script could not make its endTime (its additionalMsec
  * clamped to zero) and landed that far late; null means no deadline was set.
+ * started is performance.now() at the script's first statement — the game
+ * begins exec'd scripts on async module-load promise chains, so actual start
+ * order is the engine's choice and worth auditing against exec order.
  */
 export interface WorkerResult {
 	value: number
 	margin: number | null
+	started: number | null
 }
 
 /**
@@ -76,8 +80,20 @@ export class Worker {
 		                                  stockType === this.stock)
 		if (pid) {
 			return this.#ns.nextPortWrite(pid).then(() => {
-				const { result, margin } = JSON.parse(String(this.#ns.readPort(pid)))
-				return { value: Number(result), margin }
+				const payload = JSON.parse(String(this.#ns.readPort(pid)))
+				const value = Number(payload?.result)
+				const margin = payload?.margin
+				const started = payload?.started
+				// Only finite numbers may pass: the JSON round-trip turns
+				// NaN/Infinity into null, and a foreign payload (a stray write
+				// on this pid's port) has no margin field at all — undefined
+				// slipping through here poisoned the wave margin aggregates
+				// into NaN and blinded the deadline-slack audit.
+				return {
+					value: Number.isFinite(value) ? value : 0,
+					margin: typeof margin === "number" && Number.isFinite(margin) ? margin : null,
+					started: typeof started === "number" && Number.isFinite(started) ? started : null,
+				}
 			})
 		} else {
 			throw new Error("Failed to start " + tool)
@@ -298,6 +314,18 @@ abstract class ExecutableTask implements WorkerTask {
 	readonly outcomes: number[] = []
 	/** Hostname each instance was launched on. */
 	readonly hosts: string[] = []
+	/** performance.now() at each instance's first statement, if reported. */
+	readonly startTimes: (number | null)[] = []
+	/**
+	 * Deadline chunking: every chunkBatches instances the deadline steps
+	 * chunkMs later. The timer layer scrambles landings within a host
+	 * segment (measured: starts in perfect exec order, positive margins,
+	 * landings still displaced thousands of scripts) but respects expiry
+	 * order, so stepping the deadline per chunk segments that scramble the
+	 * way per-host offsets segment the host merge. 0 disables.
+	 */
+	chunkBatches = 0
+	chunkMs = 0
 
 	protected constructor(ns: NS, script: string, target: string, threads: number, endTime: number) {
 		this.baseRam = ns.getScriptRam(script)
@@ -313,9 +341,17 @@ abstract class ExecutableTask implements WorkerTask {
 		return this.threads * this.baseRam
 	}
 
+	protected deadline(instance: number): number {
+		if (!this.endTime || !this.chunkBatches || !this.chunkMs) {
+			return this.endTime
+		}
+		return this.endTime + Math.floor(instance / this.chunkBatches) * this.chunkMs
+	}
+
 	protected land(instance: number, res: WorkerResult) {
 		this.landingOrder[instance] = ++landingCounter
 		this.outcomes[instance] = res.value
+		this.startTimes[instance] = res.started
 		if (res.margin !== null) {
 			if (res.margin < 0) {
 				this.clamped++
@@ -345,7 +381,7 @@ export class HackTask extends ExecutableTask {
 		const instance = this.launches++
 		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
-		promises.push(worker.hack(this.target, this.threads * scaling, this.endTime)
+		promises.push(worker.hack(this.target, this.threads * scaling, this.deadline(instance))
 			.then(res => {
 				this.land(instance, res)
 				this.proceeds += res.value
@@ -371,7 +407,7 @@ export class GrowTask extends ExecutableTask {
 		const instance = this.launches++
 		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
-		promises.push(worker.grow(this.target, this.threads * scaling, this.endTime)
+		promises.push(worker.grow(this.target, this.threads * scaling, this.deadline(instance))
 			.then(res => {
 				this.land(instance, res)
 				this.landings++
@@ -396,7 +432,7 @@ export class WeakenTask extends ExecutableTask {
 		const instance = this.launches++
 		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
-		promises.push(worker.weaken(this.target, this.threads * scaling, this.endTime)
+		promises.push(worker.weaken(this.target, this.threads * scaling, this.deadline(instance))
 			.then(res => {
 				this.land(instance, res)
 				this.landings++

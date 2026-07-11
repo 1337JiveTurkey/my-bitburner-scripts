@@ -34,12 +34,13 @@ export default class BatchExecutor {
 	 * by ~L other batches. Take matched (1 - hackPercent)^L with L ≈ 7.0-7.3
 	 * across 3.55% and 4.65% batch shapes. bestBatch discounts candidates
 	 * by that factor, which steers selection toward smaller hackPercent on
-	 * wider fleets. hostSpacing removes the merge itself and leaves only a
-	 * residual ~0.9 (adjacent batch pairs still swap; measured 96-97% take
-	 * at 4.65% batches), so with spacing active this should sit near 1,
-	 * and near 7 only when spacing is off. 0 disables the discount.
+	 * wider fleets. hostSpacing plus deadline chunking remove the merge
+	 * almost entirely — measured implied backlog 0.04 at the 200k-script
+	 * cap — so the default sits near zero; raise toward ~1 with chunking
+	 * off, and toward ~7 with host spacing off too. The hack ledger's
+	 * "implied backlog" is the live calibration. 0 disables the discount.
 	 */
-	backlogBatches = 1.0
+	backlogBatches = 0.05
 
 	/**
 	 * Milliseconds between consecutive hosts' deadlines. The standing
@@ -55,6 +56,24 @@ export default class BatchExecutor {
 	 * millisecond-scale, so it can likely be tightened toward ~25ms.
 	 */
 	hostSpacing = 100
+
+	/**
+	 * Deadline chunk spacing: chunk k of the wave (each chunk is chunkSize
+	 * contiguous batches in exec order) lands chunkSpacing ms after chunk
+	 * k-1. Host spacing segments the merge between hosts; this segments
+	 * the timer-layer scramble inside a host segment, which at the 200k
+	 * script cap displaces landings a median ~2300 scripts (implied
+	 * backlog ~3.3) even though starts run in perfect exec order with
+	 * positive margins. Tail cost is (batches/chunkSize) × chunkSpacing,
+	 * and MAX_SCRIPTS/3 bounds batches, so the cost stays a fixed few
+	 * seconds — unlike true per-batch staggering, which is forbidden.
+	 * 0 disables.
+	 * Validated at 100 batches / 5ms on the 200k-script cap: implied
+	 * backlog fell 3.3 → 0.04, gain ratio 39% → 98.9%, landing-vs-exec
+	 * displacement 2315 → 62, and the midwave tape reads pure hgw cycles.
+	 */
+	chunkSize = 100
+	chunkSpacing = 5
 
 	constructor(ns: NS, log: Log|null=null) {
 		this.#ns = ns
@@ -123,6 +142,10 @@ export default class BatchExecutor {
 		const hackTask = new HackTask(this.#ns, hostname, batch.hackThreads, endTime)
 		const growTask = new GrowTask(this.#ns, hostname, batch.growThreads, endTime)
 		const weakenTask = new WeakenTask(this.#ns, hostname, batch.weakThreads, endTime)
+		for (const task of [hackTask, growTask, weakenTask]) {
+			task.chunkBatches = this.chunkSize
+			task.chunkMs = this.chunkSpacing
+		}
 		const batchTask = new CompoundTask(hackTask, growTask, weakenTask)
 
 		const results = await this.#pool.executeBatchTask(batchTask)
@@ -138,6 +161,7 @@ export default class BatchExecutor {
 		this.#logLandingProfile(batch, hackTask, growTask)
 		this.#auditHostBlocking(hackTask, growTask, weakenTask)
 		this.#auditInterleave(hackTask, growTask, weakenTask)
+		this.#auditStartOrder(hackTask, growTask, weakenTask)
 		return hackTask.proceeds
 	}
 
@@ -154,9 +178,18 @@ export default class BatchExecutor {
 	#logHackLedger(batch: BatchStats, hackTask: HackTask, levelAtFire: number) {
 		const f = this.#ns.format
 		const sized = batch.hackMoney * hackTask.launches
-		this.#log.info("Hack ledger: $%s gained of $%s sized server loss (%s gain ratio); hacking level %d at fire, %d now",
-			f.number(hackTask.proceeds), f.number(sized),
-			f.percent(sized ? hackTask.proceeds / sized : 0),
+		const ratio = sized ? hackTask.proceeds / sized : 0
+		// Inverts take = (1 - hackPercent)^L to report the backlog this wave
+		// actually behaved like — the calibration to feed --backlog-batches.
+		// It is scale-dependent: ~1 at 23k scripts with host spacing on,
+		// ~3 at the 200k script cap.
+		const p = batch.hackPercent
+		const implied = ratio > 0 && ratio < 1 && p > 0 && p < 1
+			? Math.log(ratio) / Math.log(1 - p) : null
+		this.#log.info("Hack ledger: $%s gained of $%s sized server loss (%s gain ratio, implied backlog %s); "
+			+ "hacking level %d at fire, %d now",
+			f.number(hackTask.proceeds), f.number(sized), f.percent(ratio),
+			implied === null ? "n/a" : f.number(implied),
 			levelAtFire, this.#ns.getHackingLevel())
 	}
 
@@ -394,6 +427,63 @@ export default class BatchExecutor {
 		this.#log.info("Landing interleave: mean same-type run %s scripts (max %d); "
 			+ "median hack-to-grow gap %d scripts (1 = adjacent); midwave tape: %s",
 			this.#ns.format.number(events.length / runs), maxRun, medianGap, tape)
+	}
+
+	/**
+	 * Compares the order scripts actually began running against the order
+	 * the launch loop exec'd them, and landing order against exec order.
+	 * The exec side is deterministic — pool order, then instance order,
+	 * then h,g,w within a batch — and, because the exec loop is host-major
+	 * and hostSpacing makes deadlines host-major, exec order IS the
+	 * expected landing order. The game gives no such guarantee for starts:
+	 * exec'd scripts begin on async module-load promise chains (bitburner-src
+	 * NetscriptWorker.ts startNetscript2Script), so start order is the
+	 * engine's choice. Healthy is start-vs-exec possibly noisy (self-timing
+	 * absorbs start drift while margins stay positive) with landing-vs-exec
+	 * near zero; landing-vs-exec tracking start-vs-exec means clamped
+	 * scripts landed by start time instead of deadline (raise launch slack).
+	 */
+	#auditStartOrder(hackTask: HackTask, growTask: GrowTask, weakenTask: WeakenTask) {
+		const tasks = [hackTask, growTask, weakenTask]
+		const events: { start: number, stamp: number, execIdx: number, startRank: number, stampRank: number }[] = []
+		for (let t = 0; t < tasks.length; t++) {
+			for (let i = 0; i < tasks[t].launches; i++) {
+				const start = tasks[t].startTimes[i]
+				const stamp = tasks[t].landingOrder[i]
+				if (start !== null && start !== undefined && stamp !== undefined) {
+					events.push({ start, stamp, execIdx: i * 3 + t, startRank: 0, stampRank: 0 })
+				}
+			}
+		}
+		if (events.length < 2) {
+			return
+		}
+		events.sort((a, b) => a.execIdx - b.execIdx)
+		let inverted = 0
+		for (let i = 1; i < events.length; i++) {
+			if (events[i].start < events[i - 1].start) {
+				inverted++
+			}
+		}
+		const byStart = [...events].sort((a, b) => a.start - b.start || a.execIdx - b.execIdx)
+		byStart.forEach((e, rank) => e.startRank = rank)
+		const byStamp = [...events].sort((a, b) => a.stamp - b.stamp)
+		byStamp.forEach((e, rank) => e.stampRank = rank)
+		const spread = byStart[byStart.length - 1].start - byStart[0].start
+		const startVsExec = this.#median(events.map((e, i) => Math.abs(e.startRank - i)))
+		const landVsExec = this.#median(events.map((e, i) => Math.abs(e.stampRank - i)))
+		this.#log.info("Start order: %d ms spread; %s of adjacent exec pairs started out of order; "
+			+ "median displacement start-vs-exec %d, landing-vs-exec %d scripts",
+			Math.round(spread), this.#ns.format.percent(inverted / (events.length - 1)),
+			startVsExec, landVsExec)
+	}
+
+	#median(values: number[]): number {
+		if (!values.length) {
+			return 0
+		}
+		values.sort((a, b) => a - b)
+		return values[values.length >> 1]
 	}
 
 	/** Sorts [stamp, value] pairs by stamp and averages equal-count buckets. */
