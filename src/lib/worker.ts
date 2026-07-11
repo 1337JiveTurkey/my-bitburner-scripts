@@ -10,6 +10,17 @@ const CHARGE_WORKER = "workers/charge.js"
 export const MAX_SCRIPTS = 200000
 
 /**
+ * What a hack/grow/weaken worker reports back on its port: the operation's
+ * result, plus the deadline margin the script saw when it started. A negative
+ * margin means the script could not make its endTime (its additionalMsec
+ * clamped to zero) and landed that far late; null means no deadline was set.
+ */
+export interface WorkerResult {
+	value: number
+	margin: number | null
+}
+
+/**
  * Worker that runs on a given host with various worker scripts. The methods
  * on a worker can be directly invoked or a WorkerTask can be passed in with
  * the parameters on the WorkerPool.
@@ -55,7 +66,7 @@ export class Worker {
 	           target: string,
 	           threads: number,
 	           endTime: number,
-	           stockType: string): Promise<number> {
+	           stockType: string): Promise<WorkerResult> {
 		const deadline = endTime ? endTime + this.landingOffset : endTime
 		const pid: number = this.#ns.exec(tool,
 		                                  this.hostname,
@@ -64,21 +75,24 @@ export class Worker {
 		                                  deadline,
 		                                  stockType === this.stock)
 		if (pid) {
-			return this.#ns.nextPortWrite(pid).then(() => this.#ns.readPort(pid))
+			return this.#ns.nextPortWrite(pid).then(() => {
+				const { result, margin } = JSON.parse(String(this.#ns.readPort(pid)))
+				return { value: Number(result), margin }
+			})
 		} else {
 			throw new Error("Failed to start " + tool)
 		}
 	}
 
-	async hack(target: string, threads: number, endTime: number): Promise<number> {
+	async hack(target: string, threads: number, endTime: number): Promise<WorkerResult> {
 		return this.exec(HACK_WORKER, target, threads, endTime, "hack")
 	}
 
-	async grow(target: string, threads: number, endTime: number): Promise<number> {
+	async grow(target: string, threads: number, endTime: number): Promise<WorkerResult> {
 		return this.exec(GROW_WORKER, target, threads, endTime, "grow")
 	}
 
-	async weaken(target: string, threads: number, endTime: number): Promise<number> {
+	async weaken(target: string, threads: number, endTime: number): Promise<WorkerResult> {
 		return this.exec(WEAKEN_WORKER, target, threads, endTime, "weaken")
 	}
 
@@ -276,6 +290,14 @@ abstract class ExecutableTask implements WorkerTask {
 	launches = 0
 	/** Resolution-order stamp per instance, recorded as each script lands. */
 	readonly landingOrder: number[] = []
+	/** Scripts that reported starting too late to make the shared deadline. */
+	clamped = 0
+	/** Smallest deadline margin reported in ms; negative = landed that late. */
+	minMargin: number | null = null
+	/** Each instance's op return value (money, multiplier, or removed). */
+	readonly outcomes: number[] = []
+	/** Hostname each instance was launched on. */
+	readonly hosts: string[] = []
 
 	protected constructor(ns: NS, script: string, target: string, threads: number, endTime: number) {
 		this.baseRam = ns.getScriptRam(script)
@@ -291,8 +313,17 @@ abstract class ExecutableTask implements WorkerTask {
 		return this.threads * this.baseRam
 	}
 
-	protected stamp(instance: number) {
+	protected land(instance: number, res: WorkerResult) {
 		this.landingOrder[instance] = ++landingCounter
+		this.outcomes[instance] = res.value
+		if (res.margin !== null) {
+			if (res.margin < 0) {
+				this.clamped++
+			}
+			if (this.minMargin === null || res.margin < this.minMargin) {
+				this.minMargin = res.margin
+			}
+		}
 	}
 
 	abstract execute(worker: Worker, promises: Promise<any>[], scaling: number): void;
@@ -312,13 +343,14 @@ export class HackTask extends ExecutableTask {
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		const instance = this.launches++
+		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.hack(this.target, this.threads * scaling, this.endTime)
-			.then(money => {
-				this.stamp(instance)
-				this.proceeds += money
+			.then(res => {
+				this.land(instance, res)
+				this.proceeds += res.value
 				this.landings++
-				if (!money) {
+				if (!res.value) {
 					this.failures++
 				}
 			}))
@@ -337,12 +369,13 @@ export class GrowTask extends ExecutableTask {
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		const instance = this.launches++
+		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.grow(this.target, this.threads * scaling, this.endTime)
-			.then(multiplier => {
-				this.stamp(instance)
+			.then(res => {
+				this.land(instance, res)
 				this.landings++
-				if (multiplier < 1.0001) {
+				if (res.value < 1.0001) {
 					this.noops++
 				}
 			}))
@@ -361,12 +394,13 @@ export class WeakenTask extends ExecutableTask {
 
 	execute(worker: Worker, promises: Promise<any>[], scaling: number) {
 		const instance = this.launches++
+		this.hosts[instance] = worker.hostname
 		this.threadsLaunched += this.threads * scaling
 		promises.push(worker.weaken(this.target, this.threads * scaling, this.endTime)
-			.then(removed => {
-				this.stamp(instance)
+			.then(res => {
+				this.land(instance, res)
 				this.landings++
-				this.reduced += removed
+				this.reduced += res.value
 			}))
 	}
 }

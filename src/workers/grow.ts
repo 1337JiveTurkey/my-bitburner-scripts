@@ -7,9 +7,15 @@ export async function main(ns: NS) {
 	const stock = !!ns.args[2]
 
 	let result = 1
-	ns.atExit(() => ns.writePort(ns.pid, result))
+	let margin: number | null = null
+	ns.atExit(() => ns.writePort(ns.pid, JSON.stringify({ result, margin })))
 	// Self-time toward the absolute deadline using the live duration, so the
-	// landing order survives any drift between scheduling and starting.
-	const additionalMsec = Math.max(endTime - Date.now() - ns.getGrowTime(hostname), 0)
-	result = await ns.grow(hostname, { additionalMsec: additionalMsec, stock: stock })
+	// landing order survives any drift between scheduling and starting. A
+	// negative margin means this script started too late to make the deadline
+	// and lands that far past it instead; it's reported back so the executor
+	// can size its launch slack off the fleet's real launch spread.
+	if (endTime) {
+		margin = endTime - Date.now() - ns.getGrowTime(hostname)
+	}
+	result = await ns.grow(hostname, { additionalMsec: Math.max(margin ?? 0, 0), stock: stock })
 }
