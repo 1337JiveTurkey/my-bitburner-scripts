@@ -62,6 +62,8 @@ import { someFn } from "lib/logging"  // Library imports
 
 **Validate mechanics against the game source, not from memory.** The authoritative reference is https://github.com/bitburner-official/bitburner-src — e.g., coding contract generators and answer checkers live in `src/CodingContract/contracts/`. Contract inputs are often generated adversarially (deliberate edge cases), so check the generator before trusting a solver.
 
+**Engine assumptions the code depends on are catalogued in `GAME-ASSUMPTIONS.md`** (PID monotonicity, port semantics, timer firing order, fortify rules, RAM analysis quirks, the MAX_SCRIPTS stability budget). Check it before relying on engine behavior or "fixing" code that encodes it; add new entries with evidence and date when a new assumption gets verified or measured.
+
 **`ns.enums.*` objects map TypeScript-side keys to the string values the API expects**, and the two often differ (`CrimeType.shoplift` → `"Shoplift"`, `GymType.strength` → `"str"`). Iterate with `Object.values(...)`, never `Object.entries`/`Object.keys`, and don't `as`-cast a string past the type error — the cast hides exactly this mismatch, which the game then rejects at runtime. Enum types like `CrimeType` are already the value union, so correctly-obtained values need no cast.
 
 ## Game Connection
