@@ -1,7 +1,7 @@
 import { NS } from "@ns"
 import Log from "lib/logging"
 import { BatchStats } from "lib/batch-stats"
-import { WorkerPool, CompoundTask, HackTask, GrowTask, WeakenTask, MAX_SCRIPTS } from "lib/worker"
+import { WorkerPool, CompoundTask, HackTask, GrowTask, WeakenTask, MAX_SCRIPTS, RESULT_GRACE } from "lib/worker"
 
 /**
  * Executes a batch that's been calculated by a BatchCalculator.
@@ -148,11 +148,17 @@ export default class BatchExecutor {
 		}
 		const batchTask = new CompoundTask(hackTask, growTask, weakenTask)
 
-		const results = await this.#pool.executeBatchTask(batchTask)
-		const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected")
-		if (failures.length > 0) {
-			this.#log.warn("%d of %d batch scripts failed to launch: %s",
-				failures.length, results.length - 1, failures[0].reason)
+		const results = await this.#pool.executeBatchTask(batchTask, this.#waveBudget(endTime))
+		if (results === null) {
+			this.#log.error("Wave never fully reported: %d/%d/%d hack/grow/weaken landings by the budget; "
+				+ "continuing with what landed (scripts killed before starting never write their port)",
+				hackTask.landings, growTask.landings, weakenTask.landings)
+		} else {
+			const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected")
+			if (failures.length > 0) {
+				this.#log.warn("%d of %d batch scripts failed to launch: %s",
+					failures.length, results.length - 1, failures[0].reason)
+			}
 		}
 		this.#logWaveStats(batch, hackTask, growTask, weakenTask)
 		this.#logHackLedger(batch, hackTask, levelAtFire)
@@ -163,6 +169,22 @@ export default class BatchExecutor {
 		this.#auditInterleave(hackTask, growTask, weakenTask)
 		this.#auditStartOrder(hackTask, growTask, weakenTask)
 		return hackTask.proceeds
+	}
+
+	/**
+	 * The latest instant any script of this wave could still legitimately
+	 * report: the base deadline, plus the last host's offset, plus the last
+	 * chunk's step (overestimated from the batch cap, since the real batch
+	 * count isn't known until after the launch loop), plus grace for the
+	 * landing burst's processing lag. Bounds the pool's wait so a script
+	 * that died before starting can't hang the wave forever.
+	 */
+	#waveBudget(endTime: number): number {
+		const hostTail = this.hostSpacing * Math.max(this.#pool.workers.length - 1, 0)
+		const chunkTail = this.chunkSize > 0
+			? Math.ceil(MAX_SCRIPTS / 3 / this.chunkSize) * this.chunkSpacing
+			: 0
+		return endTime + hostTail + chunkTail + RESULT_GRACE
 	}
 
 	/**

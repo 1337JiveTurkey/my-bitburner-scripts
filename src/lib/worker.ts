@@ -10,6 +10,14 @@ const CHARGE_WORKER = "workers/charge.js"
 export const MAX_SCRIPTS = 200000
 
 /**
+ * How long past its last possible landing a wave's scripts get to report
+ * before the pool stops waiting. Generous because port writes resolve only
+ * as the landing burst is processed, which reaches tens of seconds at the
+ * MAX_SCRIPTS scale.
+ */
+export const RESULT_GRACE = 60000
+
+/**
  * What a hack/grow/weaken worker reports back on its port: the operation's
  * result, plus the deadline margin the script saw when it started. A negative
  * margin means the script could not make its endTime (its additionalMsec
@@ -171,9 +179,10 @@ export class WorkerPool {
 	/**
 	 * Executes a task by creating as many copies of it as the pool can handle.
 	 * Individual script failures are reported in the settled results rather
-	 * than rejecting the whole batch.
+	 * than rejecting the whole batch. waitUntil bounds the wait (see #settle);
+	 * null means it timed out.
 	 */
-	async executeBatchTask(task: WorkerTask): Promise<PromiseSettledResult<any>[]> {
+	async executeBatchTask(task: WorkerTask, waitUntil = 0): Promise<PromiseSettledResult<any>[] | null> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
 w:		for (const worker of this.workers) {
 			const multiplier = worker.numberOfInstances(task.ram)
@@ -184,14 +193,15 @@ w:		for (const worker of this.workers) {
 				}
 			}
 		}
-		return await Promise.allSettled(promises)
+		return await this.#settle(promises, waitUntil)
 	}
 
 	/**
 	 * Executes a task that scales its threads to use up available resources
 	 * on the thread pool, up to maxScale copies of the task in total.
+	 * waitUntil bounds the wait (see #settle); null means it timed out.
 	 */
-	async executeScalingTask(task: WorkerTask, maxScale: number = Infinity): Promise<PromiseSettledResult<any>[]> {
+	async executeScalingTask(task: WorkerTask, maxScale: number = Infinity, waitUntil = 0): Promise<PromiseSettledResult<any>[] | null> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
 		let remaining = maxScale
 		for (const worker of this.workers) {
@@ -204,13 +214,14 @@ w:		for (const worker of this.workers) {
 				break
 			}
 		}
-		return await Promise.allSettled(promises)
+		return await this.#settle(promises, waitUntil)
 	}
 
 	/**
-	 * Executes a task with no special behavior.
+	 * Executes a task with no special behavior. waitUntil bounds the wait
+	 * (see #settle); null means it timed out.
 	 */
-	async executeTask(task: WorkerTask): Promise<PromiseSettledResult<any>[]> {
+	async executeTask(task: WorkerTask, waitUntil = 0): Promise<PromiseSettledResult<any>[] | null> {
 		const promises: Promise<any>[] = [this.#ns.asleep(1000)]
 		for (const worker of this.workers) {
 			const multiplier = worker.numberOfInstances(task.ram)
@@ -218,7 +229,30 @@ w:		for (const worker of this.workers) {
 				task.execute(worker, promises, 1)
 			}
 		}
-		return await Promise.allSettled(promises)
+		return await this.#settle(promises, waitUntil)
+	}
+
+	/**
+	 * Waits for every script's result, but never past waitUntil (0 = wait
+	 * forever, the old behavior). A script killed before its atExit
+	 * registers — the window is module load, before main()'s first
+	 * statement — never writes its port, and one lost promise would hang
+	 * the wave's allSettled forever. One shared timer bounds the whole
+	 * wait: per-script timers would double the wave's timer count, which
+	 * is real engine load at MAX_SCRIPTS scale. On timeout the caller gets
+	 * null and proceeds with whatever landed — the tasks' own counters
+	 * already hold every script that did report, and a straggler that
+	 * reports later merely updates counters nobody reads again.
+	 */
+	async #settle(promises: Promise<any>[], waitUntil: number): Promise<PromiseSettledResult<any>[] | null> {
+		const all = Promise.allSettled(promises)
+		if (!waitUntil) {
+			return await all
+		}
+		return await Promise.race([
+			all,
+			this.#ns.asleep(Math.max(waitUntil - Date.now(), 1000)).then(() => null),
+		])
 	}
 
 	numberOfInstances(executableRam: number): number {

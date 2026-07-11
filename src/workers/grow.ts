@@ -5,14 +5,16 @@ export async function main(ns: NS) {
 	// the game starts exec'd scripts on async module-load promise chains, so
 	// start order is the engine's choice, not exec order. Sub-ms and RAM-free.
 	const started = performance.now()
+	let result = 1
+	let margin: number | null = null
+	// Registered before anything that can throw (arg parsing included): the
+	// pool is waiting on this port, so a script that dies without writing it
+	// would otherwise strand the whole wave.
+	ns.atExit(() => ns.writePort(ns.pid, JSON.stringify({ result, margin, started })))
 	ns.disableLog("ALL")
 	const hostname = ns.args[0].toString()
 	const endTime = Number(ns.args[1] || 0)
 	const stock = !!ns.args[2]
-
-	let result = 1
-	let margin: number | null = null
-	ns.atExit(() => ns.writePort(ns.pid, JSON.stringify({ result, margin, started })))
 	// Self-time toward the absolute deadline using the live duration, so the
 	// landing order survives any drift between scheduling and starting. A
 	// negative margin means this script started too late to make the deadline

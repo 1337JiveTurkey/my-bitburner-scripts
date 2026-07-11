@@ -2,7 +2,7 @@ import {NS} from "@ns"
 import Log from "lib/logging"
 import dodgedMain from "lib/dodge-script"
 import {PrepareServerParams, PrepareServerResults} from "/lib/hacking/interface";
-import {CompoundTask, GrowTask, WeakenTask, WorkerPool} from "/lib/worker";
+import {CompoundTask, GrowTask, RESULT_GRACE, WeakenTask, WorkerPool} from "/lib/worker";
 
 
 export const main: (ns: NS) => Promise<void> = dodgedMain<PrepareServerParams, PrepareServerResults>(async (ns: NS, p: PrepareServerParams, log: Log): Promise<PrepareServerResults> => {
@@ -47,10 +47,11 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool, log: Log): P
 
 		log.fine("%s growth: %d weaken: %d", target, growThreads, excessWeakThreads + growthWeakThreads)
 
-		let results: PromiseSettledResult<any>[]
+		let results: PromiseSettledResult<any>[] | null
 		if (excessWeakThreads) {
 			const weakenTask = new WeakenTask(ns, target, 1, 0)
-			results = await pool.executeScalingTask(weakenTask, excessWeakThreads)
+			results = await pool.executeScalingTask(weakenTask, excessWeakThreads,
+				Date.now() + weakTime + RESULT_GRACE)
 			log.info("Weaken pass launched %d/%d threads and removed %s of %s excess",
 				weakenTask.threadsLaunched, excessWeakThreads,
 				ns.format.number(weakenTask.reduced), ns.format.number(excessDifficulty))
@@ -58,12 +59,16 @@ async function prepServer(ns: NS, target: string, pool: WorkerPool, log: Log): P
 			const growUnits = Math.ceil(growThreads / growsPerWeaken)
 			const endTime = Date.now() + weakTime
 			results = await pool.executeScalingTask(new CompoundTask(new GrowTask(ns, target, growsPerWeaken, endTime),
-				new WeakenTask(ns, target, 1, endTime)), growUnits)
+				new WeakenTask(ns, target, 1, endTime)), growUnits,
+				endTime + RESULT_GRACE)
 		} else {
 			break
 		}
-		// The only settled promise is the pool's built-in sleep, so nothing ran
-		if (results.length <= 1) {
+		if (results === null) {
+			// The loop re-reads the server, so a lost script only costs a retry
+			log.warn("Prep pass on %s never fully reported, retrying", target)
+		} else if (results.length <= 1) {
+			// The only settled promise is the pool's built-in sleep, so nothing ran
 			log.warn("No worker RAM free to prep %s, waiting", target)
 		}
 	} while (true)
