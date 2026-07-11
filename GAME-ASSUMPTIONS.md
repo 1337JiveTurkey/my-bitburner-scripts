@@ -23,7 +23,19 @@ Depended on by: the worker result protocol — which is why `Worker.exec` only
 accepts finite-number payload fields (one marginless-JSON payload was observed
 on a worker's pid port at 200k-script scale, 2026-07-11; mechanism unresolved,
 candidates: stale queue data, a stray writer). `clean-ports.js` exists because
-queues accumulate garbage.
+queues accumulate garbage. `read`/`peek` on an empty port return the string
+`"NULL PORT DATA"`.
+
+**Ports hold at most `Settings.MaxPortCapacity` messages (default 50,
+user-configurable in game options); `write` on a full port evicts the OLDEST
+entry, `tryWrite` refuses instead.** Verified: `src/NetscriptPort.ts`,
+2026-07-11. Consequence: funneling a wave's results through one shared port
+cannot work — during a landing burst tens of thousands of `atExit` writes
+occur before any reader script gets a turn (expired-timer starvation,
+measured), so all but the newest ~50 results would be silently destroyed. The
+pid-sharded one-message-per-port design in `Worker.exec` sidesteps the cap at
+queue depth 1 and is the correct architecture, not merely a convention; the
+200k live `nextPortWrite` listeners are the price of that correctness.
 
 **`ns.exec` is synchronous but `main()` starts on an async module-load promise
 chain** (`src/NetscriptWorker.ts`, `startNetscript2Script`), so start order is
