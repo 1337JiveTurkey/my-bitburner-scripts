@@ -12,6 +12,31 @@ export default class BatchExecutor {
 	readonly #log: Log
 	readonly #pool: WorkerPool
 
+	/**
+	 * Extra milliseconds added to the shared deadline beyond one weaken time.
+	 * Weakens have zero natural slack: their duration IS the base flight
+	 * time, so any weaken that starts after the deadline is stamped computes
+	 * a negative additionalMsec, clamps to zero, and lands late by its own
+	 * launch delay. On a fleet big enough that launching the wave takes
+	 * seconds, that slides the entire weaken group behind the hack+grow
+	 * burst — security piles up unweakened to the 100 cap and hack chance
+	 * hits zero mid-wave. Size this above the fleet's launch spread; the
+	 * per-wave deadline-slack log line reports the observed margin to tune by.
+	 */
+	launchSlack = 5000
+
+	/**
+	 * Milliseconds between consecutive hosts' deadlines. A wave lands as a
+	 * fair merge of one in-order stream per host, leaving a standing
+	 * backlog of unhealed hacks that taxes every take; spacing hosts'
+	 * deadlines segments the merge back into whole host streams. Expiry
+	 * order dominates the interleave, so segmentation holds even when the
+	 * engine processes a host's landings slower than the spacing. Costs
+	 * hosts × spacing of added tail — fixed in fleet size, unlike the
+	 * per-batch spacing the design forbids. 0 keeps one shared deadline.
+	 */
+	hostSpacing = 0
+
 	constructor(ns: NS, log: Log|null=null) {
 		this.#ns = ns
 		if (log) {
@@ -66,7 +91,8 @@ export default class BatchExecutor {
 		const hostname = target.hostname
 		this.#log.fine("Targeting %s with %s", hostname, this.#ns.format.percent(batch.hackPercent))
 
-		const endTime = Date.now() + this.#ns.getWeakenTime(hostname)
+		this.#pool.workers.forEach((worker, i) => worker.landingOffset = i * this.hostSpacing)
+		const endTime = Date.now() + this.#ns.getWeakenTime(hostname) + this.launchSlack
 		const levelAtFire = this.#ns.getHackingLevel()
 		const hackTask = new HackTask(this.#ns, hostname, batch.hackThreads, endTime)
 		const growTask = new GrowTask(this.#ns, hostname, batch.growThreads, endTime)

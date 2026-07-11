@@ -21,6 +21,15 @@ export class Worker {
 
 	stock: "grow"|"hack"|null = null
 
+	/**
+	 * Milliseconds added to any deadline this worker's scripts are given.
+	 * A wave lands as a fair merge of one in-order stream per host, so
+	 * spacing hosts' deadlines apart segments the merge: each host's
+	 * batches land contiguously in their own h/g/w order instead of a
+	 * merge round away from each other.
+	 */
+	landingOffset = 0
+
 	constructor(ns: NS, hostname: string, maxRam: number) {
 		this.#ns = ns
 		this.hostname = hostname
@@ -47,11 +56,12 @@ export class Worker {
 	           threads: number,
 	           endTime: number,
 	           stockType: string): Promise<number> {
+		const deadline = endTime ? endTime + this.landingOffset : endTime
 		const pid: number = this.#ns.exec(tool,
 		                                  this.hostname,
 		                                  { threads: threads, temporary: true },
 		                                  target,
-		                                  endTime,
+		                                  deadline,
 		                                  stockType === this.stock)
 		if (pid) {
 			return this.#ns.nextPortWrite(pid).then(() => this.#ns.readPort(pid))
