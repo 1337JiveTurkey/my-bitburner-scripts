@@ -27,6 +27,14 @@ export default class BatchCalculator implements TargetStats {
 	 * max) instead of paying a full prep cycle for a sub-1% dip.
 	 */
 	prepTolerance: number = 1
+	/**
+	 * Absolute security above minimum that doesn't count as needing prep.
+	 * A wave's ragged tail routinely strands a few tenths of excess, and
+	 * the next wave's padded weakens absorb that within a handful of
+	 * batches — far cheaper than a full weaken-time prep pass between
+	 * waves. 0 demands exactly minimum security.
+	 */
+	securityTolerance: number = 0
 
 	hostname = ""
 	hackRam = 0
@@ -86,7 +94,10 @@ export default class BatchCalculator implements TargetStats {
 	recalculateTimes() {
 		this.#log.fine("Recalculating execution times")
 		if (this.needsPrep()) {
-			this.#log.warn("Server needs prep so times are slower than expected")
+			// fine, not warn: the constructor calls this before the caller has
+			// set the prep tolerances, so at default strictness this fires on
+			// servers the real needsPrep() check will then wave through
+			this.#log.fine("Server needs prep so times are slower than expected")
 		}
 		if (this.#useFormulas) {
 			this.#recalculateTimesFormula()
@@ -291,13 +302,13 @@ export default class BatchCalculator implements TargetStats {
 
 	/**
 	 * Returns whether this server needs to be prepped in the first place.
-	 * Security must be exactly at minimum; money only has to clear
-	 * prepTolerance's share of max.
+	 * Security must be within securityTolerance of minimum; money only has
+	 * to clear prepTolerance's share of max.
 	 */
 	needsPrep(): boolean {
 		this.#log.fine("Determining whether prep is necessary")
 		const s = this.#ns.getServer(this.hostname)
-		if (s.hackDifficulty !== s.minDifficulty) {
+		if ((s.hackDifficulty ?? Infinity) > (s.minDifficulty ?? 0) + this.securityTolerance) {
 			return true
 		}
 		return (s.moneyAvailable ?? 0) < (s.moneyMax ?? 0) * this.prepTolerance

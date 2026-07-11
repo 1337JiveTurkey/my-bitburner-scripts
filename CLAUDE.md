@@ -35,7 +35,7 @@ Pure functions that never call `ns` methods (contract solvers, batch math) compi
 
 **Worker Pool (`lib/worker.ts`)**: Manages distributed task execution across servers. Worker class handles individual server resources, WorkerPool coordinates distribution.
 
-**Batch Processing (`lib/batch-calculator.ts`, `lib/batch-executor.ts`)**: HGW (Hack-Grow-Weaken) batch optimization with timing calculations, thread management, and RAM optimization. This is a deliberate **shotgun batcher**: every script in a wave self-times to one shared absolute deadline and lands simultaneously. Waves can reach tens of thousands of batches, so **never introduce per-batch landing offsets or staggered deadlines** — any per-batch spacing multiplies into minutes of dead tail and has already been tried and reverted. Disorder within a wave is absorbed by the calculator's `growPadding`/`weakenPadding` (set via test-new-batcher's `--grow-padding`/`--weaken-padding` flags), not by ordering guarantees.
+**Batch Processing (`lib/batch-calculator.ts`, `lib/batch-executor.ts`)**: HGW (Hack-Grow-Weaken) batch optimization with timing calculations, thread management, and RAM optimization. This is a deliberate **shotgun batcher**: every script in a wave self-times to one shared absolute deadline and lands simultaneously. Waves can reach tens of thousands of batches, so **never introduce per-batch landing offsets or staggered deadlines** — any per-batch spacing multiplies into minutes of dead tail and has already been tried and reverted. Disorder within a wave is absorbed by the calculator's `growPadding`/`weakenPadding` (set via test-new-batcher's `--grow-padding`/`--weaken-padding` flags), not by ordering guarantees. Two deliberate exceptions to "one deadline", both fixed-cost in fleet size (not per-batch): `launchSlack` pads the deadline so weakens can actually make it (without it every weaken clamps and the wave type-groups), and `hostSpacing` optionally spaces *hosts'* deadlines apart because a wave otherwise lands as a fair merge of one in-order stream per host, taxing each hack by (1 − hackPercent)^backlog (see `backlogBatches`).
 
 **State Services (`srv/`)**: Dependency-managed services tracking server, budget, target, bladeburner, gang, and hacknet state. Dependencies declared in `src/config/services.json`.
 
@@ -58,7 +58,7 @@ import { someFn } from "lib/logging"  // Library imports
 
 ## Game Behavior
 
-**Never hard-code game constants.** BitNode multipliers scale core mechanics — in the current save, weaken removes ~0.0336 security per thread, not the base 0.05. Measure at runtime instead: `ns.weakenAnalyze(1)`, `ns.hackAnalyzeSecurity(threads)`, `ns.growthAnalyzeSecurity(threads)`.
+**Never hard-code game constants.** BitNode multipliers scale core mechanics — a past save's weaken removed ~0.0336 security per thread instead of the base 0.05 (BN1 uses base values, but saves change). Measure at runtime instead: `ns.weakenAnalyze(1)`, `ns.hackAnalyzeSecurity(threads)`, `ns.growthAnalyzeSecurity(threads)`.
 
 **Validate mechanics against the game source, not from memory.** The authoritative reference is https://github.com/bitburner-official/bitburner-src — e.g., coding contract generators and answer checkers live in `src/CodingContract/contracts/`. Contract inputs are often generated adversarially (deliberate edge cases), so check the generator before trusting a solver.
 

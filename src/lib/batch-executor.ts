@@ -26,16 +26,35 @@ export default class BatchExecutor {
 	launchSlack = 5000
 
 	/**
-	 * Milliseconds between consecutive hosts' deadlines. A wave lands as a
-	 * fair merge of one in-order stream per host, leaving a standing
-	 * backlog of unhealed hacks that taxes every take; spacing hosts'
-	 * deadlines segments the merge back into whole host streams. Expiry
-	 * order dominates the interleave, so segmentation holds even when the
-	 * engine processes a host's landings slower than the spacing. Costs
-	 * hosts × spacing of added tail — fixed in fleet size, unlike the
-	 * per-batch spacing the design forbids. 0 keeps one shared deadline.
+	 * Standing backlog of unhealed hacks a landing hack sees, in batches.
+	 * The wave lands as a fair merge of one in-order stream per host
+	 * (measured: mean same-type run 1.5, median hack-to-grow gap ≈ 50
+	 * scripts on a 29-host fleet), so each batch's grow lands about a merge
+	 * round after its hack and every hack finds the server already drained
+	 * by ~L other batches. Take matched (1 - hackPercent)^L with L ≈ 7.0-7.3
+	 * across 3.55% and 4.65% batch shapes. bestBatch discounts candidates
+	 * by that factor, which steers selection toward smaller hackPercent on
+	 * wider fleets. hostSpacing removes the merge itself and leaves only a
+	 * residual ~0.9 (adjacent batch pairs still swap; measured 96-97% take
+	 * at 4.65% batches), so with spacing active this should sit near 1,
+	 * and near 7 only when spacing is off. 0 disables the discount.
 	 */
-	hostSpacing = 0
+	backlogBatches = 1.0
+
+	/**
+	 * Milliseconds between consecutive hosts' deadlines. The standing
+	 * backlog behind backlogBatches comes from the wave landing as a fair
+	 * merge of one in-order stream per host; spacing hosts' deadlines
+	 * segments the merge back into whole host streams. Expiry order
+	 * dominates the interleave, so segmentation holds even when the engine
+	 * processes a host's landings slower than the spacing. Costs hosts ×
+	 * spacing of added tail — fixed in fleet size, unlike the per-batch
+	 * spacing the design forbids. 0 keeps one shared deadline for all.
+	 * Validated at 100ms on a 29-host fleet: 0/29 stream overlaps and the
+	 * gain ratio rose from ~72% to ~97%; the jitter it must beat is
+	 * millisecond-scale, so it can likely be tightened toward ~25ms.
+	 */
+	hostSpacing = 100
 
 	constructor(ns: NS, log: Log|null=null) {
 		this.#ns = ns
@@ -64,6 +83,12 @@ export default class BatchExecutor {
 			}
 		}
 
+		if (bestBatch) {
+			this.#log.info("Selected %dh/%dg/%dw batches: %s expected take under a %s-batch backlog",
+				bestBatch.hackThreads, bestBatch.growThreads, bestBatch.weakThreads,
+				this.#ns.format.percent(Math.pow(1 - bestBatch.hackPercent, this.backlogBatches)),
+				this.#ns.format.number(this.backlogBatches))
+		}
 		return bestBatch
 	}
 
@@ -71,7 +96,8 @@ export default class BatchExecutor {
 		const ramLimited = this.#pool.numberOfInstances(batch.batchRam)
 		const countLimited = MAX_SCRIPTS / 3
 		const batches = Math.min(ramLimited, countLimited)
-		return batch.hackMoney * batches
+		const expectedTake = Math.pow(1 - batch.hackPercent, this.backlogBatches)
+		return batch.hackMoney * expectedTake * batches
 	}
 
 	/**

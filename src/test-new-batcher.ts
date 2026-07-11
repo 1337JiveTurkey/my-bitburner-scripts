@@ -12,13 +12,15 @@ export async function main(ns: NS) {
 		["grow-padding", 0.10],
 		["weaken-padding", 0.10],
 		["prep-tolerance", 0.99],
-		["launch-slack", 5000],
-		["host-spacing", 0],
+		["security-tolerance", 1.0],
+		["launch-slack", 2000],
+		["backlog-batches", 1.0],
+		["host-spacing", 100],
 	])
 	const positional = flags["_"] as string[]
 	if (positional.length !== 1 || !ns.serverExists(positional[0])) {
 		ns.tprintf("Usage: run %s [--list] [--grow-padding 0.1] [--weaken-padding 0.1] [--prep-tolerance 0.99] "
-			+ "[--launch-slack 5000] [--host-spacing 0] <hostname>",
+			+ "[--security-tolerance 1.0] [--launch-slack 2000] [--backlog-batches 1.0] [--host-spacing 100] <hostname>",
 			ns.self().filename)
 		return
 	}
@@ -31,8 +33,10 @@ export async function main(ns: NS) {
 		calculator.growPadding = flags["grow-padding"] as number
 		calculator.weakenPadding = flags["weaken-padding"] as number
 		calculator.prepTolerance = flags["prep-tolerance"] as number
+		calculator.securityTolerance = flags["security-tolerance"] as number
 		const executor = new BatchExecutor(ns, log)
 		executor.launchSlack = flags["launch-slack"] as number
+		executor.backlogBatches = flags["backlog-batches"] as number
 		executor.hostSpacing = flags["host-spacing"] as number
 
 		if (calculator.needsPrep()) {
