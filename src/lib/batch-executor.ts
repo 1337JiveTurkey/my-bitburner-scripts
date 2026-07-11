@@ -1,7 +1,7 @@
 import { NS } from "@ns"
 import Log from "lib/logging"
 import { BatchStats } from "lib/batch-stats"
-import { WorkerPool, CompoundTask, HackTask, GrowTask, WeakenTask, MAX_SCRIPTS, RESULT_GRACE } from "lib/worker"
+import { WorkerPool, CompoundTask, HackTask, GrowTask, WeakenTask, LandingClock, MAX_SCRIPTS, RESULT_GRACE } from "lib/worker"
 
 /**
  * Executes a batch that's been calculated by a BatchCalculator.
@@ -142,9 +142,13 @@ export default class BatchExecutor {
 		const hackTask = new HackTask(this.#ns, hostname, batch.hackThreads, endTime)
 		const growTask = new GrowTask(this.#ns, hostname, batch.growThreads, endTime)
 		const weakenTask = new WeakenTask(this.#ns, hostname, batch.weakThreads, endTime)
+		// One clock across all three tasks: every audit compares stamps
+		// between the wave's hacks, grows, and weakens
+		const clock = new LandingClock()
 		for (const task of [hackTask, growTask, weakenTask]) {
 			task.chunkBatches = this.chunkSize
 			task.chunkMs = this.chunkSpacing
+			task.clock = clock
 		}
 		const batchTask = new CompoundTask(hackTask, growTask, weakenTask)
 

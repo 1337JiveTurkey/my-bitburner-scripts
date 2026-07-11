@@ -317,12 +317,23 @@ export class CompoundTask implements WorkerTask {
 }
 
 /**
- * Monotonic stamp shared by every task, for observing the order scripts'
- * promises actually resolve in. Resolution order is a proxy for landing
- * order: it reflects when each worker's port write is processed, just after
- * its effect lands.
+ * Monotonic stamp source for observing the order scripts' promises resolve
+ * in (resolution order is a proxy for landing order: it reflects when each
+ * worker's port write is processed, just after its effect lands). One clock
+ * must be shared by every task of a wave so stamps compare across its
+ * hack/grow/weaken tasks — the executor assigns one per wave. Deliberately
+ * NOT module-level state: the module cache is keyed by code content, so one
+ * module instance is shared by every running script importing this file and
+ * is replaced whenever the file recompiles (see GAME-ASSUMPTIONS.md) —
+ * nothing that must count for a specific script may live at module level.
  */
-let landingCounter = 0
+export class LandingClock {
+	#counter = 0
+
+	next(): number {
+		return ++this.#counter
+	}
+}
 
 /**
  * A task that involves executing a specific script, like hack, grow or weaken.
@@ -360,6 +371,12 @@ abstract class ExecutableTask implements WorkerTask {
 	 */
 	chunkBatches = 0
 	chunkMs = 0
+	/**
+	 * Stamp source for this task's landings. Defaults to a private clock so
+	 * standalone use stamps consistently; a wave's executor assigns one
+	 * shared clock to all three tasks so their stamps are comparable.
+	 */
+	clock = new LandingClock()
 
 	protected constructor(ns: NS, script: string, target: string, threads: number, endTime: number) {
 		this.baseRam = ns.getScriptRam(script)
@@ -383,7 +400,7 @@ abstract class ExecutableTask implements WorkerTask {
 	}
 
 	protected land(instance: number, res: WorkerResult) {
-		this.landingOrder[instance] = ++landingCounter
+		this.landingOrder[instance] = this.clock.next()
 		this.outcomes[instance] = res.value
 		this.startTimes[instance] = res.started
 		if (res.margin !== null) {

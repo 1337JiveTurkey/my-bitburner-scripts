@@ -37,6 +37,17 @@ pid-sharded one-message-per-port design in `Worker.exec` sidesteps the cap at
 queue depth 1 and is the correct architecture, not merely a convention; the
 200k live `nextPortWrite` listeners are the price of that correctness.
 
+**Module-level state is shared and volatile.** The compiled-module cache is
+keyed by transformed code content, so ONE module namespace object is shared by
+every running script that imports the same file — across servers — and a new
+instance replaces it whenever the content changes (every watch-mode transpile)
+or the game reloads. A running script pins its instance for its own lifetime.
+Verified: `src/NetscriptJSEvaluator.ts` (`moduleCache.get(newCode)`),
+2026-07-11. Consequence: state that must belong to one script (counters,
+caches, registries) lives in `main`'s call path, never at module level —
+`LandingClock` in `lib/worker.ts` replaced a module-global counter for
+exactly this reason.
+
 **`ns.exec` is synchronous but `main()` starts on an async module-load promise
 chain** (`src/NetscriptWorker.ts`, `startNetscript2Script`), so start order is
 not contractually FIFO. Measured 2026-07-11: perfectly FIFO in practice at
